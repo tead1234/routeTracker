@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "415013141490",
+    "project_id": "locationtracker-b474d",
+    "storage_bucket": "locationtracker-b474d.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:415013141490:android:042cae86dd1b7451a7c96b",
+        "android_client_info": {
+          "package_name": "com.gojungparkjo.routetracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "415013141490-rujd8lu819g60dpdb10qfvo5lhngsqan.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcIEhRg6AwQIAjUPjaRDzdzRE5sVduJA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "415013141490-rujd8lu819g60dpdb10qfvo5lhngsqan.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
