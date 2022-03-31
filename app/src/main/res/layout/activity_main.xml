@@ -16,6 +16,13 @@
         app:layout_constraintBottom_toTopOf="@id/tracking_button"
         >
     </androidx.constraintlayout.widget.ConstraintLayout>
+    <ProgressBar
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:id="@+id/loading_view"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/map_view"
+        app:layout_constraintEnd_toEndOf="@id/map_view"/>
 
 
     <Button

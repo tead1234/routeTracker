@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -15,6 +16,7 @@ import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.*
 import net.daum.mf.map.api.MapPOIItem
 import net.daum.mf.map.api.MapPoint
 import net.daum.mf.map.api.MapPointBounds
@@ -25,6 +27,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.coroutines.CoroutineContext
 
 
 class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
@@ -84,9 +87,11 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         MapView(this)
     }
 
-    lateinit var mapPointList: List<MapPoint>
+    var mapPointList: List<MapPoint>? = null
 
     private var requesting = false
+
+    var job :Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -144,28 +149,38 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
     }
 
     fun addMarkersWithInBound(bound: MapPointBounds?) {
-        if (mapView.zoomLevel > 2 || bound == null) return
-        Log.d(TAG, "addMarkersWithInBound: "+mapView.zoomLevel)
-        mapView.poiItems.forEach {
-            if (!bound.contains(it.mapPoint)) {
-                mapView.removePOIItem(it)
-            }
+        job?.let{
+            if(it.isActive) it.cancel()
         }
-        mapPointList.forEach {
-            if (bound.contains(it)) {
-                MapPOIItem().apply {
-                    itemName = "aa"
-                    markerType = MapPOIItem.MarkerType.RedPin
-                    mapPoint = it
-                }.also {
-                    mapView.addPOIItem(it)
+        job = CoroutineScope(Dispatchers.Main).launch {
+            binding.loadingView.visibility = View.VISIBLE
+            withContext(Dispatchers.Default){
+                if (mapView.zoomLevel > 2 || bound == null) return@withContext
+                Log.d(TAG, "addMarkersWithInBound: " + mapView.zoomLevel)
+                mapView.poiItems.forEach {
+                    if (!bound.contains(it.mapPoint)) {
+                        mapView.removePOIItem(it)
+                    }
+                }
+                mapPointList?.forEach {
+                    if (bound.contains(it)) {
+                        MapPOIItem().apply {
+                            itemName = "aa"
+                            markerType = MapPOIItem.MarkerType.RedPin
+                            mapPoint = it
+                        }.also {
+                            mapView.addPOIItem(it)
+                        }
+                    }
+
                 }
             }
-
+            binding.loadingView.visibility = View.GONE
         }
+
     }
 
-    fun readAsset() {
+    fun readAsset() = CoroutineScope(Dispatchers.IO).launch{
         val br = BufferedReader(InputStreamReader(assets.open("df.csv")))
         var line: String? = br.readLine()
         val list = LinkedList<Pair<Double, Double>>()
@@ -175,14 +190,10 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
             }
         }
         mapPointList = list.sortedWith(compareBy({ it.first }, { it.second })).map {
-//            MapPOIItem().apply {
-//                itemName = "aa"
-//                markerType = MapPOIItem.MarkerType.RedPin
-//                mapPoint = MapPoint.mapPointWithGeoCoord(it.first, it.second)
-//            }
             MapPoint.mapPointWithGeoCoord(it.first, it.second)
         }
     }
+
 
     fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
