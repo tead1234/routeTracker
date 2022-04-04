@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.google.android.gms.location.*
+import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
@@ -30,7 +31,7 @@ import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 
-class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
+class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener {
 
     private val TAG = "MainActivity"
 
@@ -89,6 +90,8 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
 
     var mapPointList: List<MapPoint>? = null
 
+    var nearestSign :MapPOIItem? = null
+
     private var requesting = false
 
     var job :Job? = null
@@ -115,12 +118,44 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
+        mapView.setCurrentLocationEventListener(this)
 
         readAsset()
 
     }
 
+    override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
+        p1?.let{
+            CoroutineScope(Dispatchers.Main).launch{
+            mapPointList?.nearestSign(p1)?.let{
+                nearestSign?.let{
+                    mapView.removePOIItem(it)
+                }
+                nearestSign = MapPOIItem().apply {
+                    itemName = "near"
+                    markerType = MapPOIItem.MarkerType.BluePin
+                    mapPoint = it
+                }.also {
+                    mapView.addPOIItem(it)
+                }
+                binding.nearTextView.text = "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
+
+            }
+            }
+        }
+    }
+
+    override fun onCurrentLocationDeviceHeadingUpdate(p0: MapView?, p1: Float) {
+    }
+
+    override fun onCurrentLocationUpdateFailed(p0: MapView?) {
+    }
+
+    override fun onCurrentLocationUpdateCancelled(p0: MapView?) {
+    }
+
     override fun onMapViewInitialized(p0: MapView?) {
+
     }
 
     override fun onMapViewCenterPointMoved(p0: MapView?, p1: MapPoint?) {
@@ -215,6 +250,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
     @SuppressLint("MissingPermission")
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
         binding.trackingButton.setBackgroundColor(Color.RED)
+        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOnWithHeading
         requesting = true
         fusedLocationProviderClient.requestLocationUpdates(
             createLocationRequest(),
@@ -225,6 +261,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
 
     fun stopTracking() {
         requesting = false
+        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOff
         stopLocationUpdates()
     }
 
