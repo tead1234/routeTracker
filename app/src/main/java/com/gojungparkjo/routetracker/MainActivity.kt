@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
                 for (location in locationResult.locations) {
+                    mapView.setMapCenterPoint(MapPoint.mapPointWithGeoCoord(location.latitude, location.longitude), true);
                     binding.textView.setText(
                         "위도 ${location.latitude}" +
                                 "경도 ${location.longitude}" +
@@ -115,7 +116,6 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
-
         readAsset()
 
     }
@@ -189,6 +189,8 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
                 list.add(Pair(it[1].toDouble(), it[0].toDouble()))
             }
         }
+        // 아래가 정렬
+
         mapPointList = list.sortedWith(compareBy({ it.first }, { it.second })).map {
             MapPoint.mapPointWithGeoCoord(it.first, it.second)
         }
@@ -213,6 +215,11 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
     }
 
     @SuppressLint("MissingPermission")
+//    fun startTracking() {
+//        binding.trackingButton.setBackgroundColor(Color.RED)
+//        requesting = true
+//        mapView.setCurrentLocationTrackingMode(MapView.CurrentLocationTrackingMode.TrackingModeOnWithoutHeading)
+//    }
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
         binding.trackingButton.setBackgroundColor(Color.RED)
         requesting = true
@@ -227,6 +234,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         requesting = false
         stopLocationUpdates()
     }
+
 
     fun createLocationRequest() = LocationRequest.create().apply {
         interval = 1000
