@@ -13,12 +13,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
-import com.gojungparkjo.routetracker.databinding.BalloonBinding
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
-import net.daum.mf.map.api.*
+import net.daum.mf.map.api.MapPOIItem
+import net.daum.mf.map.api.MapPoint
+import net.daum.mf.map.api.MapPointBounds
+import net.daum.mf.map.api.MapView
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.LocalDateTime
@@ -115,6 +117,14 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
         }
+        binding.numberPicker.apply{
+            minValue = 0
+            maxValue = 22
+            setOnValueChangedListener { _, _, _ ->
+                mapView.removeAllPOIItems()
+                addMarkersWithInBound(mapView.mapPointBounds)
+            }
+        }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
         mapView.setCurrentLocationEventListener(this)
@@ -200,7 +210,6 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     override fun onMapViewMoveFinished(mapView: MapView?, p1: MapPoint?) {
         addMarkersWithInBound(mapView?.mapPointBounds)
     }
-
     fun addMarkersWithInBound(bound: MapPointBounds?) {
         job?.let{
             if(it.isActive) it.cancel()
@@ -211,8 +220,9 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
                 if (mapView.zoomLevel > 2 || bound == null) return@withContext
                 Log.d(TAG, "addMarkersWithInBound: " + mapView.zoomLevel)
                 val temp = mapView.poiItems
+                val selectedType = binding.numberPicker.value
                 mapPointList?.forEach {
-                    if (bound.contains(it.coordinate)) {
+                    if (bound.contains(it.coordinate)&&it.signalType==selectedType) {
                         MapPOIItem().apply {
                             itemName = it.toString()
                             markerType = MapPOIItem.MarkerType.RedPin
@@ -230,12 +240,12 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     }
 
     fun readAsset() = CoroutineScope(Dispatchers.IO).launch{
-        val br = BufferedReader(InputStreamReader(assets.open("df.csv")))
+        val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
         var line: String? = br.readLine()
         val list = LinkedList<TrafficSign>()
         while (br.readLine().also { line = it } != null) {
             line!!.split(",").also {
-                list.add(TrafficSign(it[1],it[2],it[3],it[4],it[5],it[6],it[7],it[8],it[9],it[10],it[11],it[12],it[13],it[14],it[15],it[16],it[17],it[18],it[19],it[20],it[21],it[22],it[23].toDouble(),it[24].toDouble(),it[25],
+                list.add(TrafficSign(it[1],it[2],it[3],it[4],it[5],it[6],it[7],it[8],it[9].toDouble().toInt(),it[10],it[11],it[12],it[13],it[14],it[15],it[16],it[17],it[18],it[19],it[20],it[21],it[22],it[23].toDouble(),it[24].toDouble(),it[25],
                     MapPoint.mapPointWithGeoCoord(it[27].toDouble(),it[26].toDouble())))
             }
         }

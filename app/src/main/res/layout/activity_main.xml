@@ -59,6 +59,13 @@
         android:layout_margin="5dp"
         android:background="@drawable/rounded_gray_transparent_bg"/>
 
-
+    <NumberPicker
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:id="@+id/number_picker"
+        android:background="@drawable/rounded_gray_transparent_bg"
+        />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -11,7 +11,7 @@ data class TrafficSign(
     val attachDirection:String? = null,
     val signalQuant:String? = null,
     val backwardAttachQuant:String? = null,
-    val signalType:String? = null,
+    val signalType:Int? = null,
     val backwardAttachType:String? = null,
     val installDate:String? = null,
     val replaceDate:String? = null,
