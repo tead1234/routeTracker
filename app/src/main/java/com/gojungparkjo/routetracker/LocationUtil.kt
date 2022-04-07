@@ -4,13 +4,12 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.withContext
 import net.daum.mf.map.api.MapPoint
 import kotlin.math.acos
 import kotlin.math.cos
 import kotlin.math.sin
 
-suspend fun List<MapPoint>.nearestSign(currentLocation: MapPoint): MapPoint {
+suspend fun List<MapPoint>.nearestSign2(currentLocation: MapPoint): MapPoint {
     var dist = Double.MAX_VALUE
     var rtn = MapPoint.mapPointWithGeoCoord(0.0, 0.0)
     var list = this
@@ -19,6 +18,26 @@ suspend fun List<MapPoint>.nearestSign(currentLocation: MapPoint): MapPoint {
             val d = distanceInKm(
                 it.mapPointGeoCoord.latitude,
                 it.mapPointGeoCoord.longitude,
+                currentLocation.mapPointGeoCoord.latitude,
+                currentLocation.mapPointGeoCoord.longitude
+            )
+            if (dist > d) {
+                dist = d
+                rtn = it
+            }
+        }
+    }.await()
+    return rtn
+}
+suspend fun List<TrafficSign>.nearestSign(currentLocation: MapPoint): TrafficSign {
+    var dist = Double.MAX_VALUE
+    var rtn = TrafficSign(MapPoint.mapPointWithGeoCoord(0.0,0.0))
+    var list = this
+    CoroutineScope(Dispatchers.Default).async {
+        list.forEach {
+            val d = distanceInKm(
+                it.coordinate.mapPointGeoCoord.latitude,
+                it.coordinate.mapPointGeoCoord.longitude,
                 currentLocation.mapPointGeoCoord.latitude,
                 currentLocation.mapPointGeoCoord.longitude
             )

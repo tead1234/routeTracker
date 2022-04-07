@@ -49,5 +49,16 @@
         android:id="@+id/near_text_view"
         />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/info_text_view"
+        android:visibility="gone"
+        android:padding="5dp"
+        app:layout_constraintBottom_toTopOf="@id/tracking_button"
+        android:layout_margin="5dp"
+        android:background="@drawable/rounded_gray_transparent_bg"/>
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
