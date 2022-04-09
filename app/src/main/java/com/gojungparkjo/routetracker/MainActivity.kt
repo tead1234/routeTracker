@@ -27,24 +27,24 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
-import kotlin.coroutines.CoroutineContext
 
 
-class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
+class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener {
 
     private val TAG = "MainActivity"
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
+
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
-
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         when {
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
                 // Precise location access granted.
+                Toast.makeText(this, "권한 있음", Toast.LENGTH_SHORT).show()
                 startTracking(fusedLocationClient)
             }
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
@@ -64,7 +64,6 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
                 for (location in locationResult.locations) {
-                    mapView.setMapCenterPoint(MapPoint.mapPointWithGeoCoord(location.latitude, location.longitude), true);
                     binding.textView.setText(
                         "위도 ${location.latitude}" +
                                 "경도 ${location.longitude}" +
@@ -89,6 +88,8 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
     }
 
     var mapPointList: List<MapPoint>? = null
+
+    var nearestSign :MapPOIItem? = null
 
     private var requesting = false
 
@@ -116,11 +117,48 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
+        mapView.setCurrentLocationEventListener(this)
+
+
+
+
+
         readAsset()
 
     }
 
+    override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
+        p1?.let{
+            CoroutineScope(Dispatchers.Main).launch{
+                mapPointList?.nearestSign(p1)?.let{
+                    nearestSign?.let{
+                        mapView.removePOIItem(it)
+                    }
+                    nearestSign = MapPOIItem().apply {
+                        itemName = "near"
+                        markerType = MapPOIItem.MarkerType.BluePin
+                        mapPoint = it
+                    }.also {
+                        mapView.addPOIItem(it)
+                    }
+                    binding.nearTextView.text = "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
+
+                }
+            }
+        }
+    }
+
+    override fun onCurrentLocationDeviceHeadingUpdate(p0: MapView?, p1: Float) {
+    }
+
+    override fun onCurrentLocationUpdateFailed(p0: MapView?) {
+    }
+
+    override fun onCurrentLocationUpdateCancelled(p0: MapView?) {
+    }
+
     override fun onMapViewInitialized(p0: MapView?) {
+
     }
 
     override fun onMapViewCenterPointMoved(p0: MapView?, p1: MapPoint?) {
@@ -189,15 +227,13 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
                 list.add(Pair(it[1].toDouble(), it[0].toDouble()))
             }
         }
-        // 아래가 정렬
-
         mapPointList = list.sortedWith(compareBy({ it.first }, { it.second })).map {
             MapPoint.mapPointWithGeoCoord(it.first, it.second)
         }
     }
 
 
-    fun checkPermissions() {
+    private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -205,21 +241,18 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
         ) {
             startTracking(fusedLocationClient)
         } else {
+            // 최초로 한번만 하는거라 상관없ㅇ므
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION
                 )
             )
+
         }
     }
 
     @SuppressLint("MissingPermission")
-//    fun startTracking() {
-//        binding.trackingButton.setBackgroundColor(Color.RED)
-//        requesting = true
-//        mapView.setCurrentLocationTrackingMode(MapView.CurrentLocationTrackingMode.TrackingModeOnWithoutHeading)
-//    }
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
         binding.trackingButton.setBackgroundColor(Color.RED)
         requesting = true
@@ -232,9 +265,9 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener {
 
     fun stopTracking() {
         requesting = false
+        //mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOff
         stopLocationUpdates()
     }
-
 
     fun createLocationRequest() = LocationRequest.create().apply {
         interval = 1000
