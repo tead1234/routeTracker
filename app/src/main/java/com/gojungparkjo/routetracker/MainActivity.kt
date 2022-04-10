@@ -4,6 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -13,10 +17,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
-import com.gojungparkjo.routetracker.databinding.BalloonBinding
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.naver.maps.geometry.LatLng
+import com.naver.maps.geometry.LatLngBounds
+import com.naver.maps.map.MapFragment
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.OnMapReadyCallback
+import com.naver.maps.map.overlay.Marker
 import kotlinx.coroutines.*
 import net.daum.mf.map.api.*
 import java.io.BufferedReader
@@ -27,7 +36,8 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 
-class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener,MapView.POIItemEventListener {
+class MainActivity : AppCompatActivity(), SensorEventListener,
+    OnMapReadyCallback {
 
     private val TAG = "MainActivity"
 
@@ -80,17 +90,22 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
 
     lateinit var binding: ActivityMainBinding
 
-    private val mapView: MapView by lazy {
-        MapView(this)
-    }
+    private lateinit var naverMap: NaverMap
 
     var mapPointList: List<TrafficSign>? = null
 
-    var nearestSign :MapPOIItem? = null
+//    var nearestSign: MapPOIItem? = null
 
     private var requesting = false
 
-    var job :Job? = null
+    var job: Job? = null
+
+    lateinit var sensorManager: SensorManager
+    private val accelerometerReading = FloatArray(3)
+    private val magnetometerReading = FloatArray(3)
+
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,128 +130,188 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
         }
-        binding.mapView.addView(mapView)
-        mapView.setMapViewEventListener(this)
-        mapView.setCurrentLocationEventListener(this)
-        mapView.setPOIItemEventListener(this)
+        binding.numberPicker.apply {
+            minValue = 0
+            maxValue = 22
+            setOnValueChangedListener { _, _, _ ->
+                addMarkersWithInBound(naverMap.contentBounds)
+            }
+        }
+        binding.filterSwitch.setOnCheckedChangeListener { _, _ ->
+            addMarkersWithInBound(naverMap.contentBounds)
+        }
+
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+
+        val fm = supportFragmentManager
+        val mapFragment = fm.findFragmentById(R.id.map) as MapFragment?
+            ?: MapFragment.newInstance().also {
+                fm.beginTransaction().add(R.id.map, it).commit()
+            }
+        mapFragment.getMapAsync(this)
+
 
         readAsset()
 
     }
 
-    override fun onPOIItemSelected(p0: MapView?, p1: MapPOIItem?) {
-        binding.infoTextView.text = p1?.itemName?:return
-        binding.infoTextView.visibility = View.VISIBLE
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event == null) return
+        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
+        } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
+            System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
+        }
+        updateOrientationAngles()
     }
 
-    override fun onCalloutBalloonOfPOIItemTouched(p0: MapView?, p1: MapPOIItem?) {
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
     }
 
-    override fun onCalloutBalloonOfPOIItemTouched(
-        p0: MapView?,
-        p1: MapPOIItem?,
-        p2: MapPOIItem.CalloutBalloonButtonType?
-    ) {
+    fun updateOrientationAngles() {
+        // Update rotation matrix, which is needed to update orientation angles.
+        SensorManager.getRotationMatrix(
+            rotationMatrix,
+            null,
+            accelerometerReading,
+            magnetometerReading
+        )
+
+        // "mRotationMatrix" now has up-to-date information.
+
+        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+        // "mOrientationAngles" now has up-to-date information.
+        val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360) % 360).toInt()
+        binding.compassTextView.text = degree.toString()
     }
 
-    override fun onDraggablePOIItemMoved(p0: MapView?, p1: MapPOIItem?, p2: MapPoint?) {
-    }
-
-    override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
-        p1?.let{
-            CoroutineScope(Dispatchers.Main).launch{
-            mapPointList?.nearestSign(p1)?.let{
-                nearestSign?.let{
-                    mapView.removePOIItem(it)
-                }
-                nearestSign = MapPOIItem().apply {
-                    itemName = "near"
-                    markerType = MapPOIItem.MarkerType.BluePin
-                    mapPoint = it.coordinate
-                }.also {
-                    mapView.addPOIItem(it)
-                }
-                binding.nearTextView.text = "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
-
-            }
-            }
+    override fun onResume() {
+        super.onResume()
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also { accelerometer ->
+            sensorManager.registerListener(
+                this,
+                accelerometer,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                SensorManager.SENSOR_DELAY_UI
+            )
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.also { magneticField ->
+            sensorManager.registerListener(
+                this,
+                magneticField,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                SensorManager.SENSOR_DELAY_UI
+            )
         }
     }
 
-    override fun onCurrentLocationDeviceHeadingUpdate(p0: MapView?, p1: Float) {
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
     }
 
-    override fun onCurrentLocationUpdateFailed(p0: MapView?) {
-    }
-
-    override fun onCurrentLocationUpdateCancelled(p0: MapView?) {
-    }
-
-    override fun onMapViewInitialized(p0: MapView?) {
+    override fun onMapReady(naverMap: NaverMap) {
+        this.naverMap = naverMap
+        naverMap.addOnCameraIdleListener {
+            addMarkersWithInBound(naverMap.contentBounds)
+        }
 
     }
 
-    override fun onMapViewCenterPointMoved(p0: MapView?, p1: MapPoint?) {
-    }
+//    override fun onPOIItemSelected(p0: MapView?, p1: MapPOIItem?) {
+//        binding.infoTextView.text = p1?.itemName ?: return
+//        binding.infoTextView.visibility = View.VISIBLE
+//    }
 
-    override fun onMapViewZoomLevelChanged(mapView: MapView?, p1: Int) {
-    }
+//    override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
+//        p1?.let {
+//            CoroutineScope(Dispatchers.Main).launch {
+//                mapPointList?.nearestSign(p1)?.let {
+//                    nearestSign?.let {
+//                        mapView.removePOIItem(it)
+//                    }
+//                    nearestSign = MapPOIItem().apply {
+//                        itemName = "near"
+//                        markerType = MapPOIItem.MarkerType.BluePin
+//                        mapPoint = it.coordinate
+//                    }.also {
+//                        mapView.addPOIItem(it)
+//                    }
+//                    binding.nearTextView.text =
+//                        "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
+//
+//                }
+//            }
+//        }
+//    }
 
-    override fun onMapViewSingleTapped(p0: MapView?, p1: MapPoint?) {
-    }
 
-    override fun onMapViewDoubleTapped(p0: MapView?, p1: MapPoint?) {
-    }
-
-    override fun onMapViewLongPressed(p0: MapView?, p1: MapPoint?) {
-    }
-
-    override fun onMapViewDragStarted(p0: MapView?, p1: MapPoint?) {
-    }
-
-    override fun onMapViewDragEnded(p0: MapView?, p1: MapPoint?) {
-    }
-
-    override fun onMapViewMoveFinished(mapView: MapView?, p1: MapPoint?) {
-        addMarkersWithInBound(mapView?.mapPointBounds)
-    }
-
-    fun addMarkersWithInBound(bound: MapPointBounds?) {
-        job?.let{
-            if(it.isActive) it.cancel()
+    fun addMarkersWithInBound(bound: LatLngBounds?) {
+        job?.let {
+            if (it.isActive) it.cancel()
         }
         job = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
-            withContext(Dispatchers.Default){
-                if (mapView.zoomLevel > 2 || bound == null) return@withContext
-                Log.d(TAG, "addMarkersWithInBound: " + mapView.zoomLevel)
-                val temp = mapView.poiItems
+            withContext(Dispatchers.Default) {
+                Log.d(TAG, "addMarkersWithInBound")
+                if (bound == null) return@withContext
+                val selectedType = binding.numberPicker.value
+                removeAllMarker()
                 mapPointList?.forEach {
-                    if (bound.contains(it.coordinate)) {
-                        MapPOIItem().apply {
-                            itemName = it.toString()
-                            markerType = MapPOIItem.MarkerType.RedPin
-                            mapPoint = it.coordinate
-                        }.also {
-                            mapView.addPOIItem(it)
+                    if (bound.contains(it.marker.position) && (!binding.filterSwitch.isChecked || it.signalType == selectedType)) {
+                        withContext(Dispatchers.Main) {
+                            it.marker.map = naverMap
                         }
                     }
                 }
-                mapView.removePOIItems(temp)
             }
             binding.loadingView.visibility = View.GONE
         }
 
     }
 
-    fun readAsset() = CoroutineScope(Dispatchers.IO).launch{
-        val br = BufferedReader(InputStreamReader(assets.open("df.csv")))
+    suspend fun removeAllMarker() = withContext(Dispatchers.Main) {
+        mapPointList?.forEach {
+            it.marker.map = null
+        }
+    }
+
+    fun readAsset() = CoroutineScope(Dispatchers.IO).launch {
+        val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
         var line: String? = br.readLine()
         val list = LinkedList<TrafficSign>()
         while (br.readLine().also { line = it } != null) {
             line!!.split(",").also {
-                list.add(TrafficSign(it[1],it[2],it[3],it[4],it[5],it[6],it[7],it[8],it[9],it[10],it[11],it[12],it[13],it[14],it[15],it[16],it[17],it[18],it[19],it[20],it[21],it[22],it[23].toDouble(),it[24].toDouble(),it[25],
-                    MapPoint.mapPointWithGeoCoord(it[27].toDouble(),it[26].toDouble())))
+                list.add(
+                    TrafficSign(
+                        it[1],
+                        it[2],
+                        it[3],
+                        it[4],
+                        it[5],
+                        it[6],
+                        it[7],
+                        it[8],
+                        it[9].toDouble().toInt(),
+                        it[10],
+                        it[11],
+                        it[12],
+                        it[13],
+                        it[14],
+                        it[15],
+                        it[16],
+                        it[17],
+                        it[18],
+                        it[19],
+                        it[20],
+                        it[21],
+                        it[22],
+                        it[23].toDouble(),
+                        it[24].toDouble(),
+                        it[25],
+                        Marker(LatLng(it[27].toDouble(), it[26].toDouble()))
+                    )
+                )
             }
         }
         Log.d(TAG, "readAsset: loaded")
@@ -264,7 +339,6 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     @SuppressLint("MissingPermission")
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
         binding.trackingButton.setBackgroundColor(Color.RED)
-//        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOnWithHeading
         requesting = true
         fusedLocationProviderClient.requestLocationUpdates(
             createLocationRequest(),
@@ -275,7 +349,6 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
 
     fun stopTracking() {
         requesting = false
-//        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOff
         stopLocationUpdates()
     }
 
@@ -287,6 +360,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     private fun stopLocationUpdates() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
+
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(REQUESTING_CODE, requesting)

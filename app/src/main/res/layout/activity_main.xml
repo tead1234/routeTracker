@@ -15,6 +15,11 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/tracking_button"
         >
+
+        <fragment android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/map"
+            android:name="com.naver.maps.map.MapFragment" />
     </androidx.constraintlayout.widget.ConstraintLayout>
     <ProgressBar
         android:layout_width="35dp"
@@ -59,6 +64,33 @@
         android:layout_margin="5dp"
         android:background="@drawable/rounded_gray_transparent_bg"/>
 
+    <NumberPicker
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:id="@+id/number_picker"
+        android:background="@drawable/rounded_gray_transparent_bg"
+        />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/compass_text_view"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:background="@drawable/rounded_gray_transparent_bg"
+        />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/filter_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/number_picker"
+        app:layout_constraintEnd_toEndOf="@id/number_picker"
+        app:layout_constraintStart_toStartOf="@id/number_picker"
+        android:background="@drawable/rounded_gray_transparent_bg"
+        />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
