@@ -15,6 +15,11 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/tracking_button"
         >
+
+        <fragment android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/map"
+            android:name="com.naver.maps.map.MapFragment" />
     </androidx.constraintlayout.widget.ConstraintLayout>
     <ProgressBar
         android:layout_width="35dp"

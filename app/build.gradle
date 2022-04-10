@@ -37,6 +37,8 @@ android {
 
 dependencies {
 
+    implementation 'com.naver.maps:map-sdk:3.14.0'
+
     implementation files('libs/libDaumMapAndroid.jar')
 
     
