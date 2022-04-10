@@ -1,10 +1,10 @@
 package com.gojungparkjo.routetracker
 
 import android.util.Log
+import com.naver.maps.geometry.LatLng
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import net.daum.mf.map.api.MapPoint
 import kotlin.math.acos
 import kotlin.math.cos
 import kotlin.math.sin
