@@ -4,6 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -17,10 +21,7 @@ import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
-import net.daum.mf.map.api.MapPOIItem
-import net.daum.mf.map.api.MapPoint
-import net.daum.mf.map.api.MapPointBounds
-import net.daum.mf.map.api.MapView
+import net.daum.mf.map.api.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.LocalDateTime
@@ -29,7 +30,8 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 
-class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener,MapView.POIItemEventListener {
+class MainActivity : AppCompatActivity(), MapView.MapViewEventListener,
+    MapView.CurrentLocationEventListener, MapView.POIItemEventListener, SensorEventListener {
 
     private val TAG = "MainActivity"
 
@@ -88,11 +90,18 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
 
     var mapPointList: List<TrafficSign>? = null
 
-    var nearestSign :MapPOIItem? = null
+    var nearestSign: MapPOIItem? = null
 
     private var requesting = false
 
-    var job :Job? = null
+    var job: Job? = null
+
+    lateinit var sensorManager: SensorManager
+    private val accelerometerReading = FloatArray(3)
+    private val magnetometerReading = FloatArray(3)
+
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +126,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
         }
-        binding.numberPicker.apply{
+        binding.numberPicker.apply {
             minValue = 0
             maxValue = 22
             setOnValueChangedListener { _, _, _ ->
@@ -125,17 +134,78 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
                 addMarkersWithInBound(mapView.mapPointBounds)
             }
         }
+        binding.filterSwitch.setOnCheckedChangeListener { _, _ ->
+            mapView.removeAllPOIItems()
+            addMarkersWithInBound(mapView.mapPointBounds)
+        }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
         mapView.setCurrentLocationEventListener(this)
         mapView.setPOIItemEventListener(this)
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+
 
         readAsset()
 
     }
 
+    override fun onSensorChanged(event: SensorEvent?) {
+        if(event==null) return
+        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
+        } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
+            System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
+        }
+        updateOrientationAngles()
+    }
+
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+    }
+
+    fun updateOrientationAngles() {
+        // Update rotation matrix, which is needed to update orientation angles.
+        SensorManager.getRotationMatrix(
+            rotationMatrix,
+            null,
+            accelerometerReading,
+            magnetometerReading
+        )
+
+        // "mRotationMatrix" now has up-to-date information.
+
+        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+        // "mOrientationAngles" now has up-to-date information.
+        val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360)%360).toInt()
+        binding.compassTextView.text = degree.toString()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also { accelerometer ->
+            sensorManager.registerListener(
+                this,
+                accelerometer,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                SensorManager.SENSOR_DELAY_UI
+            )
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.also { magneticField ->
+            sensorManager.registerListener(
+                this,
+                magneticField,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                SensorManager.SENSOR_DELAY_UI
+            )
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
+    }
+
     override fun onPOIItemSelected(p0: MapView?, p1: MapPOIItem?) {
-        binding.infoTextView.text = p1?.itemName?:return
+        binding.infoTextView.text = p1?.itemName ?: return
         binding.infoTextView.visibility = View.VISIBLE
     }
 
@@ -153,22 +223,23 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     }
 
     override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
-        p1?.let{
-            CoroutineScope(Dispatchers.Main).launch{
-            mapPointList?.nearestSign(p1)?.let{
-                nearestSign?.let{
-                    mapView.removePOIItem(it)
-                }
-                nearestSign = MapPOIItem().apply {
-                    itemName = "near"
-                    markerType = MapPOIItem.MarkerType.BluePin
-                    mapPoint = it.coordinate
-                }.also {
-                    mapView.addPOIItem(it)
-                }
-                binding.nearTextView.text = "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
+        p1?.let {
+            CoroutineScope(Dispatchers.Main).launch {
+                mapPointList?.nearestSign(p1)?.let {
+                    nearestSign?.let {
+                        mapView.removePOIItem(it)
+                    }
+                    nearestSign = MapPOIItem().apply {
+                        itemName = "near"
+                        markerType = MapPOIItem.MarkerType.BluePin
+                        mapPoint = it.coordinate
+                    }.also {
+                        mapView.addPOIItem(it)
+                    }
+                    binding.nearTextView.text =
+                        "가장 가까운 신호등 lat: ${p1.mapPointGeoCoord.latitude} lng ${p1.mapPointGeoCoord.longitude}"
 
-            }
+                }
             }
         }
     }
@@ -210,19 +281,20 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     override fun onMapViewMoveFinished(mapView: MapView?, p1: MapPoint?) {
         addMarkersWithInBound(mapView?.mapPointBounds)
     }
+
     fun addMarkersWithInBound(bound: MapPointBounds?) {
-        job?.let{
-            if(it.isActive) it.cancel()
+        job?.let {
+            if (it.isActive) it.cancel()
         }
         job = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
-            withContext(Dispatchers.Default){
+            withContext(Dispatchers.Default) {
                 if (mapView.zoomLevel > 2 || bound == null) return@withContext
                 Log.d(TAG, "addMarkersWithInBound: " + mapView.zoomLevel)
                 val temp = mapView.poiItems
                 val selectedType = binding.numberPicker.value
                 mapPointList?.forEach {
-                    if (bound.contains(it.coordinate)&&it.signalType==selectedType) {
+                    if (bound.contains(it.coordinate) && (!binding.filterSwitch.isChecked || it.signalType == selectedType)) {
                         MapPOIItem().apply {
                             itemName = it.toString()
                             markerType = MapPOIItem.MarkerType.RedPin
@@ -239,14 +311,42 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
 
     }
 
-    fun readAsset() = CoroutineScope(Dispatchers.IO).launch{
+    fun readAsset() = CoroutineScope(Dispatchers.IO).launch {
         val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
         var line: String? = br.readLine()
         val list = LinkedList<TrafficSign>()
         while (br.readLine().also { line = it } != null) {
             line!!.split(",").also {
-                list.add(TrafficSign(it[1],it[2],it[3],it[4],it[5],it[6],it[7],it[8],it[9].toDouble().toInt(),it[10],it[11],it[12],it[13],it[14],it[15],it[16],it[17],it[18],it[19],it[20],it[21],it[22],it[23].toDouble(),it[24].toDouble(),it[25],
-                    MapPoint.mapPointWithGeoCoord(it[27].toDouble(),it[26].toDouble())))
+                list.add(
+                    TrafficSign(
+                        it[1],
+                        it[2],
+                        it[3],
+                        it[4],
+                        it[5],
+                        it[6],
+                        it[7],
+                        it[8],
+                        it[9].toDouble().toInt(),
+                        it[10],
+                        it[11],
+                        it[12],
+                        it[13],
+                        it[14],
+                        it[15],
+                        it[16],
+                        it[17],
+                        it[18],
+                        it[19],
+                        it[20],
+                        it[21],
+                        it[22],
+                        it[23].toDouble(),
+                        it[24].toDouble(),
+                        it[25],
+                        MapPoint.mapPointWithGeoCoord(it[27].toDouble(), it[26].toDouble())
+                    )
+                )
             }
         }
         Log.d(TAG, "readAsset: loaded")
@@ -297,6 +397,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     private fun stopLocationUpdates() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
+
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(REQUESTING_CODE, requesting)
