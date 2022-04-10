@@ -1,8 +1,6 @@
 package com.gojungparkjo.routetracker
 
-import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.overlay.Marker
-import net.daum.mf.map.api.MapPoint
 
 data class TrafficSign(
     val attachMgtNumber:String? = null,

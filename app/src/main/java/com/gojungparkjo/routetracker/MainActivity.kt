@@ -3,6 +3,7 @@ package com.gojungparkjo.routetracker
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.content.res.AssetManager
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -16,18 +17,23 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.gojungparkjo.routetracker.ProjUtil.toLatLng
+import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
+import com.gojungparkjo.routetracker.model.TrafficSafetyResponse
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.gson.Gson
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.PolygonOverlay
 import kotlinx.coroutines.*
-import net.daum.mf.map.api.*
+import org.locationtech.proj4j.ProjCoordinate
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.LocalDateTime
@@ -42,6 +48,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val TAG = "MainActivity"
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    val repository = RoadRepository()
 
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
@@ -245,7 +253,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //        }
 //    }
 
-
     fun addMarkersWithInBound(bound: LatLngBounds?) {
         job?.let {
             if (it.isActive) it.cancel()
@@ -264,6 +271,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         }
                     }
                 }
+                if (naverMap.cameraPosition.zoom > 16) {
+                    val temp = repository.getRoadInBound(bound)
+                    removeAllPolygon()
+                    temp?.features?.forEach {
+                        it.geometry?.coordinates?.forEach {
+                            val list = mutableListOf<LatLng>()
+                            it.forEach {
+                                Log.d(TAG, "addMarkersWithInBound: ${ProjCoordinate(it[0], it[1]).toLatLng()}")
+                                list.add(ProjCoordinate(it[0], it[1]).toLatLng())
+                            }
+                            if (list.size > 2) {
+                                polygonList.add(PolygonOverlay().apply {
+                                    coords = list; color = Color.WHITE
+                                    outlineWidth = 5; outlineColor = Color.GREEN
+                                })
+                            }
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        polygonList.forEach {
+                            Log.d(TAG, "addMarkersWithInBound: Polygon foreach")
+                            it.map = naverMap
+                        }
+                    }
+                }
             }
             binding.loadingView.visibility = View.GONE
         }
@@ -275,6 +307,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             it.marker.map = null
         }
     }
+    suspend fun removeAllPolygon() = withContext(Dispatchers.Main) {
+        polygonList.forEach {
+            it.map = null
+        }
+    }
+
+    val polygonList = mutableListOf<PolygonOverlay>()
 
     fun readAsset() = CoroutineScope(Dispatchers.IO).launch {
         val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
@@ -310,8 +349,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it[24].toDouble(),
                         it[25],
                         Marker(LatLng(it[27].toDouble(), it[26].toDouble()))
-                    )
+                    ).also { trafficSign ->
+                        trafficSign.marker.setOnClickListener {
+                            binding.infoTextView.text = trafficSign.toString()
+                            binding.infoTextView.visibility = View.VISIBLE
+                            true
+                        }
+                    }
                 )
+            }
+        }
+        val temp = Gson().fromJson(json, TrafficSafetyResponse::class.java)
+        Log.d(TAG, "readAsset: " + temp.toString())
+        temp?.features?.forEach {
+            it.geometry?.coordinates?.forEach {
+                if (it.size > 2) {
+                    val list = mutableListOf<LatLng>()
+                    it.forEach {
+                        list.add(LatLng(it[0], it[1]))
+                    }
+                    polygonList.add(PolygonOverlay().apply { coords = list })
+                }
+            }
+        }
+        withContext(Dispatchers.Main) {
+            polygonList.forEach {
+                it.map = naverMap
             }
         }
         Log.d(TAG, "readAsset: loaded")
@@ -369,5 +432,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
+        val json =
+            "{\"type\":\"FeatureCollection\",\"totalFeatures\":5,\"features\":[{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb6\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197862.96856089,552012.63273323],[197857.67889288,552007.06434112],[197861.11297481,552003.81610001],[197866.21685151,552009.2920792],[197862.96856089,552012.63273323]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000025948\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"002\",\"HOL\":0,\"VEL\":0,\"AW_SN_QUA\":0,\"AW_SN_LENX_CDE\":\"001\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"3-8도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":23316,\"CTK_MGRNU\":\"2005-0108-166\",\"CRS_MGRNU\":\"06-025948\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb7\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":79342,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb8\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47963,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb9\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197712.10784812,552102.57875062],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197712.10784812,552102.57875062]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47885,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eba\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.24885109,552103.16565807],[197713.35793524,552106.13463046],[197708.27990346,552109.07198985],[197706.65508975,552106.32175857],[197711.24885109,552103.16565807]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":8295,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}}],\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"urn:ogc:def:crs:EPSG::5186\"}}}"
     }
 }
+
+fun AssetManager.readAssetsFile(fileName: String): String =
+    open(fileName).bufferedReader().use { it.readText() }
