@@ -13,14 +13,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
+import com.gojungparkjo.routetracker.databinding.BalloonBinding
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
-import net.daum.mf.map.api.MapPOIItem
-import net.daum.mf.map.api.MapPoint
-import net.daum.mf.map.api.MapPointBounds
-import net.daum.mf.map.api.MapView
+import net.daum.mf.map.api.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.LocalDateTime
@@ -29,27 +27,27 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 
-class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener {
+class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.CurrentLocationEventListener,MapView.POIItemEventListener {
 
     private val TAG = "MainActivity"
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
+
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         when {
-            permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                // Precise location access granted.
-                Toast.makeText(this, "권한 있음", Toast.LENGTH_SHORT).show()
-                startTracking(fusedLocationClient)
-            }
+//            permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
+//                // Precise location access granted.
+//                startTracking(fusedLocationClient)
+//            }
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
                 // Only approximate location access granted.
-                Toast.makeText(this, "정밀 권한을 주세요", Toast.LENGTH_SHORT).show()
+                startTracking(fusedLocationClient)
+//                Toast.makeText(this, "정밀 권한을 주세요", Toast.LENGTH_SHORT).show()
             }
             else -> {
                 // No location access granted.
@@ -87,7 +85,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
         MapView(this)
     }
 
-    var mapPointList: List<MapPoint>? = null
+    var mapPointList: List<TrafficSign>? = null
 
     var nearestSign :MapPOIItem? = null
 
@@ -115,16 +113,34 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
                 checkPermissions()
             }
         }
+        binding.infoTextView.setOnClickListener {
+            it.visibility = View.GONE
+        }
         binding.mapView.addView(mapView)
         mapView.setMapViewEventListener(this)
         mapView.setCurrentLocationEventListener(this)
-
-
-
-
+        mapView.setPOIItemEventListener(this)
 
         readAsset()
 
+    }
+
+    override fun onPOIItemSelected(p0: MapView?, p1: MapPOIItem?) {
+        binding.infoTextView.text = p1?.itemName?:return
+        binding.infoTextView.visibility = View.VISIBLE
+    }
+
+    override fun onCalloutBalloonOfPOIItemTouched(p0: MapView?, p1: MapPOIItem?) {
+    }
+
+    override fun onCalloutBalloonOfPOIItemTouched(
+        p0: MapView?,
+        p1: MapPOIItem?,
+        p2: MapPOIItem.CalloutBalloonButtonType?
+    ) {
+    }
+
+    override fun onDraggablePOIItemMoved(p0: MapView?, p1: MapPOIItem?, p2: MapPoint?) {
     }
 
     override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
@@ -137,7 +153,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
                     nearestSign = MapPOIItem().apply {
                         itemName = "near"
                         markerType = MapPOIItem.MarkerType.BluePin
-                        mapPoint = it
+                        mapPoint = it.coordinate
                     }.also {
                         mapView.addPOIItem(it)
                     }
@@ -195,23 +211,19 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
             withContext(Dispatchers.Default){
                 if (mapView.zoomLevel > 2 || bound == null) return@withContext
                 Log.d(TAG, "addMarkersWithInBound: " + mapView.zoomLevel)
-                mapView.poiItems.forEach {
-                    if (!bound.contains(it.mapPoint)) {
-                        mapView.removePOIItem(it)
-                    }
-                }
+                val temp = mapView.poiItems
                 mapPointList?.forEach {
-                    if (bound.contains(it)) {
+                    if (bound.contains(it.coordinate)) {
                         MapPOIItem().apply {
-                            itemName = "aa"
+                            itemName = it.toString()
                             markerType = MapPOIItem.MarkerType.RedPin
-                            mapPoint = it
+                            mapPoint = it.coordinate
                         }.also {
                             mapView.addPOIItem(it)
                         }
                     }
-
                 }
+                mapView.removePOIItems(temp)
             }
             binding.loadingView.visibility = View.GONE
         }
@@ -221,40 +233,38 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
     fun readAsset() = CoroutineScope(Dispatchers.IO).launch{
         val br = BufferedReader(InputStreamReader(assets.open("df.csv")))
         var line: String? = br.readLine()
-        val list = LinkedList<Pair<Double, Double>>()
+        val list = LinkedList<TrafficSign>()
         while (br.readLine().also { line = it } != null) {
-            line!!.split(",").takeLast(2).also {
-                list.add(Pair(it[1].toDouble(), it[0].toDouble()))
+            line!!.split(",").also {
+                list.add(TrafficSign(it[1],it[2],it[3],it[4],it[5],it[6],it[7],it[8],it[9],it[10],it[11],it[12],it[13],it[14],it[15],it[16],it[17],it[18],it[19],it[20],it[21],it[22],it[23].toDouble(),it[24].toDouble(),it[25],
+                    MapPoint.mapPointWithGeoCoord(it[27].toDouble(),it[26].toDouble())))
             }
         }
-        mapPointList = list.sortedWith(compareBy({ it.first }, { it.second })).map {
-            MapPoint.mapPointWithGeoCoord(it.first, it.second)
-        }
+        Log.d(TAG, "readAsset: loaded")
+        mapPointList = list
     }
 
 
-    private fun checkPermissions() {
+    fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             startTracking(fusedLocationClient)
         } else {
-            // 최초로 한번만 하는거라 상관없ㅇ므
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION
                 )
             )
-
         }
     }
 
     @SuppressLint("MissingPermission")
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
         binding.trackingButton.setBackgroundColor(Color.RED)
+        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOnWithHeading
         requesting = true
         fusedLocationProviderClient.requestLocationUpdates(
             createLocationRequest(),
@@ -265,7 +275,7 @@ class MainActivity : AppCompatActivity(), MapView.MapViewEventListener, MapView.
 
     fun stopTracking() {
         requesting = false
-        //mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOff
+//        mapView.currentLocationTrackingMode = MapView.CurrentLocationTrackingMode.TrackingModeOff
         stopLocationUpdates()
     }
 
