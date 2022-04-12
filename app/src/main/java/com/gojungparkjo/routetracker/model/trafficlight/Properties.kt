@@ -1,4 +1,4 @@
-package com.gojungparkjo.routetracker.model
+package com.gojungparkjo.routetracker.model.trafficlight
 
 
 import com.google.gson.annotations.SerializedName

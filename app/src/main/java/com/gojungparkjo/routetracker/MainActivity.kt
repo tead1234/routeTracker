@@ -20,7 +20,7 @@ import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
-import com.gojungparkjo.routetracker.model.TrafficSafetyResponse
+import com.gojungparkjo.routetracker.model.crosswalk.TrafficSafetyResponse
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -278,7 +278,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.geometry?.coordinates?.forEach {
                             val list = mutableListOf<LatLng>()
                             it.forEach {
-                                Log.d(TAG, "addMarkersWithInBound: ${ProjCoordinate(it[0], it[1]).toLatLng()}")
+                                Log.d(
+                                    TAG,
+                                    "addMarkersWithInBound: ${
+                                        ProjCoordinate(
+                                            it[0],
+                                            it[1]
+                                        ).toLatLng()
+                                    }"
+                                )
                                 list.add(ProjCoordinate(it[0], it[1]).toLatLng())
                             }
                             if (list.size > 2) {
@@ -289,9 +297,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
                     }
+                    val trafficLights = repository.getTrafficLightInBound(bound)
+                    removeTrafficLightMarker()
+                    trafficLights?.features?.forEach {
+                        it.properties?.let{
+                            if (it.sNLPKNDCDE == "007" && it.xCE !=null && it.yCE!=null) {
+                                trafficLightMarkerList.add(Marker(ProjCoordinate(it.xCE,it.yCE).toLatLng()).apply { iconTintColor = Color.RED })
+                            }
+                        }
+                    }
                     withContext(Dispatchers.Main) {
                         polygonList.forEach {
-                            Log.d(TAG, "addMarkersWithInBound: Polygon foreach")
+                            it.map = naverMap
+                        }
+                        trafficLightMarkerList.forEach {
                             it.map = naverMap
                         }
                     }
@@ -307,13 +326,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             it.marker.map = null
         }
     }
+
     suspend fun removeAllPolygon() = withContext(Dispatchers.Main) {
         polygonList.forEach {
             it.map = null
         }
     }
 
+    suspend fun removeTrafficLightMarker() = withContext(Dispatchers.Main) {
+        trafficLightMarkerList.forEach {
+            it.map = null
+        }
+        trafficLightMarkerList.clear()
+    }
+
     val polygonList = mutableListOf<PolygonOverlay>()
+    val trafficLightMarkerList = mutableListOf<Marker>()
 
     fun readAsset() = CoroutineScope(Dispatchers.IO).launch {
         val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
