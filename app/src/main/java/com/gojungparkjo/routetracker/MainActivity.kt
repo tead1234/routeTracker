@@ -452,7 +452,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //        val builder = AlertDialog.Builder(this)
 //        initTextToSpeech()
 //        ttsSpeak("우리어플평가")
-        TTS_Module.onInit()
         val dig = FeedBackDialog(this)
         dig.show(this)
     }
