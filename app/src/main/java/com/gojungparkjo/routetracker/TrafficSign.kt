@@ -1,6 +1,6 @@
 package com.gojungparkjo.routetracker
 
-import net.daum.mf.map.api.MapPoint
+import com.naver.maps.map.overlay.Marker
 
 data class TrafficSign(
     val attachMgtNumber:String? = null,
@@ -11,7 +11,7 @@ data class TrafficSign(
     val attachDirection:String? = null,
     val signalQuant:String? = null,
     val backwardAttachQuant:String? = null,
-    val signalType:String? = null,
+    val signalType:Int? = null,
     val backwardAttachType:String? = null,
     val installDate:String? = null,
     val replaceDate:String? = null,
@@ -28,7 +28,5 @@ data class TrafficSign(
     val x:Double? = null,
     val y:Double? = null,
     val constructionType:String? = null,
-    val coordinate: MapPoint
-){
-    constructor(mp:MapPoint) : this (coordinate = mp)
-}
+    val marker: Marker
+)

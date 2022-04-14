@@ -7,7 +7,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 <!--    인터넷 권한-->
     <uses-permission android:name="android.permission.INTERNET"/>
+<!--    stt권한-->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
+        android:name=".BaseApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
@@ -20,11 +24,10 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <meta-data android:name="com.kakao.sdk.AppKey" android:value="969faba5cd4ab12dc5818589c385b8a2"/>
+
     </application>
 
 </manifest>
