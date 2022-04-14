@@ -9,7 +9,9 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -20,7 +22,7 @@ import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
-import com.gojungparkjo.routetracker.model.TrafficSafetyResponse
+import com.gojungparkjo.routetracker.model.*
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -44,9 +46,8 @@ import java.util.*
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
     OnMapReadyCallback {
-
     private val TAG = "MainActivity"
-
+    private var tts: TextToSpeech? = null
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     val repository = RoadRepository()
@@ -278,7 +279,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.geometry?.coordinates?.forEach {
                             val list = mutableListOf<LatLng>()
                             it.forEach {
-                                Log.d(TAG, "addMarkersWithInBound: ${ProjCoordinate(it[0], it[1]).toLatLng()}")
+                                Log.d(
+                                    TAG,
+                                    "addMarkersWithInBound: ${
+                                        ProjCoordinate(
+                                            it[0],
+                                            it[1]
+                                        ).toLatLng()
+                                    }"
+                                )
                                 list.add(ProjCoordinate(it[0], it[1]).toLatLng())
                             }
                             if (list.size > 2) {
@@ -307,6 +316,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             it.marker.map = null
         }
     }
+
     suspend fun removeAllPolygon() = withContext(Dispatchers.Main) {
         polygonList.forEach {
             it.map = null
@@ -435,7 +445,79 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         val json =
             "{\"type\":\"FeatureCollection\",\"totalFeatures\":5,\"features\":[{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb6\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197862.96856089,552012.63273323],[197857.67889288,552007.06434112],[197861.11297481,552003.81610001],[197866.21685151,552009.2920792],[197862.96856089,552012.63273323]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000025948\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"002\",\"HOL\":0,\"VEL\":0,\"AW_SN_QUA\":0,\"AW_SN_LENX_CDE\":\"001\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"3-8도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":23316,\"CTK_MGRNU\":\"2005-0108-166\",\"CRS_MGRNU\":\"06-025948\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb7\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":79342,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb8\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47963,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb9\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197712.10784812,552102.57875062],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197712.10784812,552102.57875062]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47885,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eba\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.24885109,552103.16565807],[197713.35793524,552106.13463046],[197708.27990346,552109.07198985],[197706.65508975,552106.32175857],[197711.24885109,552103.16565807]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":8295,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}}],\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"urn:ogc:def:crs:EPSG::5186\"}}}"
     }
-}
 
-fun AssetManager.readAssetsFile(fileName: String): String =
-    open(fileName).bufferedReader().use { it.readText() }
+
+    //
+    override fun onBackPressed() {
+//        val builder = AlertDialog.Builder(this)
+//        initTextToSpeech()
+//        ttsSpeak("우리어플평가")
+        TTS_Module.onInit()
+        val dig = FeedBackDialog(this)
+        dig.show(this)
+    }
+//        builder.setTitle("종료 알림")    // 제목
+//        builder.setMessage("우리어플을평가해주세요")    // 내용
+//        ttsSpeak("어플평가해줘")
+//        // 긍정 버튼 추가
+//        builder.setPositiveButton("긍정") { dialog, which ->
+//        }
+//        // 부정 버튼 추가
+//        builder.setNegativeButton("부정") { dialog, which ->
+//            ActivityCompat.finishAffinity(this)
+//        }
+//        // 중립 버튼 추가
+//        builder.setNeutralButton("읽어") { dialog, which ->
+//
+//
+//        }
+//        // 뒤로 가기 or 바깥 부분 터치
+//        builder.setOnCancelListener {
+//        }
+//
+//        builder.show()
+//    }
+//    private fun makeDialog(){
+//        AlertDialog(
+//            onDismissRequest = {}
+//            title = {
+//
+//            }
+//        )
+//    }
+
+
+//    private fun ttsSpeak(strTTS: String) {
+//            tts?.speak(strTTS, TextToSpeech.QUEUE_ADD, null, null)
+//        }
+//    }
+
+//        fun initTextToSpeech() {
+//            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+//                Toast.makeText(this, "버전이 너무 낮아", Toast.LENGTH_SHORT).show()
+//                return
+//            }
+//            tts = TextToSpeech(this) {
+//                if (it == TextToSpeech.SUCCESS) {
+//                    val result = tts?.setLanguage(Locale.ENGLISH)
+//                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                        Toast.makeText(this, "언어지원 X", Toast.LENGTH_SHORT).show()
+//                        return@TextToSpeech
+//                    }
+//                    Toast.makeText(this, "성공", Toast.LENGTH_SHORT).show()
+//                } else {
+//                    Toast.makeText(this, "망함", Toast.LENGTH_SHORT).show()
+//                }
+//
+//            }
+//        }
+//
+//        fun ttsSpeak(strTTS: String) {
+//            tts?.speak(strTTS, TextToSpeech.QUEUE_ADD, null, null)
+//        }
+
+
+
+    fun AssetManager.readAssetsFile(fileName: String): String =
+        open(fileName).bufferedReader().use { it.readText() } }
+
