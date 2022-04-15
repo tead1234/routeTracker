@@ -2,8 +2,9 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
 import android.content.pm.PackageManager
-import android.content.res.AssetManager
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -18,6 +19,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
@@ -26,22 +28,19 @@ import com.gojungparkjo.routetracker.model.*
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.google.gson.Gson
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.Overlay
 import com.naver.maps.map.overlay.PolygonOverlay
 import kotlinx.coroutines.*
 import org.locationtech.proj4j.ProjCoordinate
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.*
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -50,8 +49,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private var tts: TextToSpeech? = null
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    val repository = RoadRepository()
-
+    private val repository = RoadRepository()
+    var currentSteps = 0
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
 
@@ -73,6 +72,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
     }
+    val stepPermissionRequest = fun (){
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),0)
+        Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
+    }
+
 
     val locationCallback by lazy {
         object : LocationCallback() {
@@ -83,7 +87,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     binding.textView.setText(
                         "위도 ${location.latitude}" +
                                 "경도 ${location.longitude}" +
-                                "속도 ${location.speed}"
+                                "속도 ${location.speed}" +
+                                // 걸음수 임시로 추가
+                                "걸음수 ${currentSteps}"
+
                     )
                     db.collection(android.os.Build.MODEL)
                         .document(LocalDateTime.now(ZoneId.of("JST")).format(dateTimeFormatter))
@@ -139,16 +146,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
         }
-        binding.numberPicker.apply {
-            minValue = 0
-            maxValue = 22
-            setOnValueChangedListener { _, _, _ ->
-                addMarkersWithInBound(naverMap.contentBounds)
-            }
-        }
-        binding.filterSwitch.setOnCheckedChangeListener { _, _ ->
-            addMarkersWithInBound(naverMap.contentBounds)
-        }
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
@@ -159,9 +156,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         mapFragment.getMapAsync(this)
 
-
-        readAsset()
-
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -170,6 +164,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
         } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
+        }else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
+            if(event.values[0]==1.0f){
+                currentSteps ++;
+            }
         }
         updateOrientationAngles()
     }
@@ -212,6 +210,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 SensorManager.SENSOR_DELAY_UI
             )
         }
+        sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
+            sensorManager.registerListener(
+                this,
+                stepDetect,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        }
     }
 
     override fun onPause() {
@@ -226,11 +231,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
 
     }
-
-//    override fun onPOIItemSelected(p0: MapView?, p1: MapPOIItem?) {
-//        binding.infoTextView.text = p1?.itemName ?: return
-//        binding.infoTextView.visibility = View.VISIBLE
-//    }
 
 //    override fun onCurrentLocationUpdate(p0: MapView?, p1: MapPoint?, p2: Float) {
 //        p1?.let {
@@ -263,44 +263,48 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             withContext(Dispatchers.Default) {
                 Log.d(TAG, "addMarkersWithInBound")
                 if (bound == null) return@withContext
-                val selectedType = binding.numberPicker.value
-                removeAllMarker()
-                mapPointList?.forEach {
-                    if (bound.contains(it.marker.position) && (!binding.filterSwitch.isChecked || it.signalType == selectedType)) {
-                        withContext(Dispatchers.Main) {
-                            it.marker.map = naverMap
-                        }
-                    }
-                }
                 if (naverMap.cameraPosition.zoom > 16) {
                     val temp = repository.getRoadInBound(bound)
                     removeAllPolygon()
-                    temp?.features?.forEach {
-                        it.geometry?.coordinates?.forEach {
+                    temp?.features?.forEach { feature ->
+                        if(feature.properties?.vIEWCDE != "002" || feature.properties.eVECDE != "001") return@forEach
+                        feature.geometry?.coordinates?.forEach {
                             val list = mutableListOf<LatLng>()
                             it.forEach {
-                                Log.d(
-                                    TAG,
-                                    "addMarkersWithInBound: ${
-                                        ProjCoordinate(
-                                            it[0],
-                                            it[1]
-                                        ).toLatLng()
-                                    }"
-                                )
                                 list.add(ProjCoordinate(it[0], it[1]).toLatLng())
                             }
                             if (list.size > 2) {
                                 polygonList.add(PolygonOverlay().apply {
                                     coords = list; color = Color.WHITE
                                     outlineWidth = 5; outlineColor = Color.GREEN
+                                    tag = feature.properties.toString()
+                                    setOnClickListener {
+                                        binding.infoTextView.text = it.tag.toString()
+                                        binding.infoTextView.visibility=View.VISIBLE
+                                        Log.d(TAG, "addMarkersWithInBound: ${it.tag.toString()}")
+                                        true
+                                    }
                                 })
+                            }
+                        }
+                    }
+                    val trafficLights = repository.getTrafficLightInBound(bound)
+                    removeTrafficLightMarker()
+                    trafficLights?.features?.forEach {feature ->
+                        if(feature.properties?.vIEWCDE != "002" || feature.properties.eVECDE != "001") return@forEach
+                        feature.properties.let{
+                            if (it.sNLPKNDCDE == "007" && it.xCE !=null && it.yCE!=null) {
+                                trafficLightMarkerList.add(Marker(ProjCoordinate(it.xCE,it.yCE).toLatLng()).apply { iconTintColor = Color.RED
+                                    tag = it.toString()
+                                    onClickListener = Overlay.OnClickListener { binding.infoTextView.text = it.tag.toString(); binding.infoTextView.visibility=View.VISIBLE; true }})
                             }
                         }
                     }
                     withContext(Dispatchers.Main) {
                         polygonList.forEach {
-                            Log.d(TAG, "addMarkersWithInBound: Polygon foreach")
+                            it.map = naverMap
+                        }
+                        trafficLightMarkerList.forEach {
                             it.map = naverMap
                         }
                     }
@@ -311,86 +315,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     }
 
-    suspend fun removeAllMarker() = withContext(Dispatchers.Main) {
-        mapPointList?.forEach {
-            it.marker.map = null
-        }
-    }
-
     suspend fun removeAllPolygon() = withContext(Dispatchers.Main) {
         polygonList.forEach {
             it.map = null
         }
     }
 
-    val polygonList = mutableListOf<PolygonOverlay>()
-
-    fun readAsset() = CoroutineScope(Dispatchers.IO).launch {
-        val br = BufferedReader(InputStreamReader(assets.open("df1.csv")))
-        var line: String? = br.readLine()
-        val list = LinkedList<TrafficSign>()
-        while (br.readLine().also { line = it } != null) {
-            line!!.split(",").also {
-                list.add(
-                    TrafficSign(
-                        it[1],
-                        it[2],
-                        it[3],
-                        it[4],
-                        it[5],
-                        it[6],
-                        it[7],
-                        it[8],
-                        it[9].toDouble().toInt(),
-                        it[10],
-                        it[11],
-                        it[12],
-                        it[13],
-                        it[14],
-                        it[15],
-                        it[16],
-                        it[17],
-                        it[18],
-                        it[19],
-                        it[20],
-                        it[21],
-                        it[22],
-                        it[23].toDouble(),
-                        it[24].toDouble(),
-                        it[25],
-                        Marker(LatLng(it[27].toDouble(), it[26].toDouble()))
-                    ).also { trafficSign ->
-                        trafficSign.marker.setOnClickListener {
-                            binding.infoTextView.text = trafficSign.toString()
-                            binding.infoTextView.visibility = View.VISIBLE
-                            true
-                        }
-                    }
-                )
-            }
+    suspend fun removeTrafficLightMarker() = withContext(Dispatchers.Main) {
+        trafficLightMarkerList.forEach {
+            it.map = null
         }
-        val temp = Gson().fromJson(json, TrafficSafetyResponse::class.java)
-        Log.d(TAG, "readAsset: " + temp.toString())
-        temp?.features?.forEach {
-            it.geometry?.coordinates?.forEach {
-                if (it.size > 2) {
-                    val list = mutableListOf<LatLng>()
-                    it.forEach {
-                        list.add(LatLng(it[0], it[1]))
-                    }
-                    polygonList.add(PolygonOverlay().apply { coords = list })
-                }
-            }
-        }
-        withContext(Dispatchers.Main) {
-            polygonList.forEach {
-                it.map = naverMap
-            }
-        }
-        Log.d(TAG, "readAsset: loaded")
-        mapPointList = list
+        trafficLightMarkerList.clear()
     }
 
+    val polygonList = mutableListOf<PolygonOverlay>()
+    val trafficLightMarkerList = mutableListOf<Marker>()
 
     fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
@@ -406,6 +345,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     Manifest.permission.ACCESS_FINE_LOCATION
                 )
             )
+        }
+        if(ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_DENIED){
+// 요청 문구 수정
+            stepPermissionRequest()
         }
     }
 
@@ -442,19 +386,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
-        val json =
-            "{\"type\":\"FeatureCollection\",\"totalFeatures\":5,\"features\":[{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb6\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197862.96856089,552012.63273323],[197857.67889288,552007.06434112],[197861.11297481,552003.81610001],[197866.21685151,552009.2920792],[197862.96856089,552012.63273323]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000025948\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"002\",\"HOL\":0,\"VEL\":0,\"AW_SN_QUA\":0,\"AW_SN_LENX_CDE\":\"001\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"3-8도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":23316,\"CTK_MGRNU\":\"2005-0108-166\",\"CRS_MGRNU\":\"06-025948\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb7\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"001\",\"VIEW_CDE\":\"002\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":79342,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb8\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.94408936,552102.44687716],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197711.94408936,552102.44687716]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47963,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eb9\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197712.10784812,552102.57875062],[197714.88172106,552106.66249563],[197709.95039139,552109.8601609],[197707.29210268,552105.66083167],[197712.10784812,552102.57875062]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":47885,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}},{\"type\":\"Feature\",\"id\":\"A004_A.fid-3bd876ce_18012dc9851_5eba\",\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[197711.24885109,552103.16565807],[197713.35793524,552106.13463046],[197708.27990346,552109.07198985],[197706.65508975,552106.32175857],[197711.24885109,552103.16565807]]]},\"geometry_name\":\"XGEO\",\"properties\":{\"MGRNU\":\"06-0000002177\",\"STAT_CDE\":\"001\",\"A004_KND_CDE\":\"001\",\"HOL\":15,\"VEL\":8,\"AW_SN_QUA\":2,\"AW_SN_LENX_CDE\":\"002\",\"EVE_CDE\":\"001\",\"OD_PE_CDE\":\"130\",\"GU_CDE\":\"140\",\"DONG_CDE\":\"16700\",\"JIBUN\":\"1-7도\",\"NW_PE_CDE\":\"130\",\"WORK_CDE\":\"004\",\"VIEW_CDE\":\"001\",\"ROD_GBN_CDE\":\"002\",\"TFC_BSS_CDE\":\"108\",\"SIXID\":null,\"ESB_YMD\":null,\"CAE_YMD\":null,\"HISID\":8295,\"CTK_MGRNU\":\"2010-0108-076\",\"CRS_MGRNU\":\"06-002177\",\"FRM_CDE\":\"005\",\"CSS_CDE\":null,\"RN_CDE\":null,\"MNG_AGEN\":null}}],\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"urn:ogc:def:crs:EPSG::5186\"}}}"
+        }
+    override fun onBackPressed() {
+        val dig = FeedBackDialog(this)
+        dig.show(this)
+    }
     }
 
 
     //
-    override fun onBackPressed() {
-//        val builder = AlertDialog.Builder(this)
-//        initTextToSpeech()
-//        ttsSpeak("우리어플평가")
-        val dig = FeedBackDialog(this)
-        dig.show(this)
-    }
+
 //        builder.setTitle("종료 알림")    // 제목
 //        builder.setMessage("우리어플을평가해주세요")    // 내용
 //        ttsSpeak("어플평가해줘")
@@ -515,8 +456,4 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //            tts?.speak(strTTS, TextToSpeech.QUEUE_ADD, null, null)
 //        }
 
-
-
-    fun AssetManager.readAssetsFile(fileName: String): String =
-        open(fileName).bufferedReader().use { it.readText() } }
 
