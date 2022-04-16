@@ -39,6 +39,7 @@ import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan
 import kotlin.math.atan2
+import kotlin.math.atanh
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -129,7 +130,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     lateinit var cancellationTokenSource: CancellationTokenSource
 
-    lateinit var pivotLocation: Marker
+    private val polygonList = mutableListOf<PolygonOverlay>()
+    private val trafficLightMarkerList = mutableListOf<Marker>()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,9 +155,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private fun bindView() {
         binding.compassTextView.setOnClickListener {
-            if (this::pivotLocation.isInitialized) pivotLocation.map = null
-            pivotLocation = Marker(naverMap.cameraPosition.target)
-            pivotLocation.map = naverMap
+            naverMap.locationOverlay.position = naverMap.cameraPosition.target
         }
 
         binding.trackingButton.setOnClickListener {
@@ -208,18 +208,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
         SensorManager.getOrientation(rotationMatrix, orientationAngles)
         // "mOrientationAngles" now has up-to-date information.
-        val degree = atan(orientationAngles[0]).toDouble().toDegree()
-        binding.compassTextView.text = degree.toString()
+        val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360) % 360)
+        binding.compassTextView.text = degree.toInt().toString()
 
-        if(this::naverMap.isInitialized) {
+        if (this::naverMap.isInitialized) {
             naverMap.let { map ->
                 map.locationOverlay.bearing = degree.toFloat()
                 trafficLightMarkerList.forEach {
-                    val temp = atan2(
+                    val temp = (atan2(
                         it.position.longitude - map.locationOverlay.position.longitude,
                         it.position.latitude - map.locationOverlay.position.latitude
-                    ).toDegree() - degree
-                    it.captionText = temp.toString()
+                    ) - degree).toDegree()
+                    it.captionText = temp.toInt().toString()
                 }
             }
 
@@ -255,7 +255,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             addMarkersWithInBound(naverMap.contentBounds)
         }
         naverMap.apply {
-            locationOverlay.icon = OverlayImage.fromResource(com.naver.maps.map.R.drawable.navermap_default_location_overlay_sub_icon_cone)
+            locationOverlay.icon =
+                OverlayImage.fromResource(com.naver.maps.map.R.drawable.navermap_default_location_overlay_sub_icon_cone)
             locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
             locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
             locationOverlay.anchor = PointF(0.5f, 1f)
@@ -290,6 +291,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     }
                 }
             }
+
             binding.loadingView.visibility = View.GONE
         }
 
@@ -352,9 +354,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
         trafficLightMarkerList.clear()
     }
-
-    private val polygonList = mutableListOf<PolygonOverlay>()
-    private val trafficLightMarkerList = mutableListOf<Marker>()
 
     fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
