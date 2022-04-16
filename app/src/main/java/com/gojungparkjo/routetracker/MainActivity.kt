@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.PointF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -27,14 +28,16 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
-import com.naver.maps.map.MapFragment
-import com.naver.maps.map.NaverMap
-import com.naver.maps.map.OnMapReadyCallback
+import com.naver.maps.map.*
+import com.naver.maps.map.overlay.LocationOverlay
 import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.OverlayImage
 import com.naver.maps.map.overlay.PolygonOverlay
+import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
+import kotlin.math.atan
 import kotlin.math.atan2
 
 
@@ -88,15 +91,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //                                .show()
 //                        }
                 }
-                    Log.d(TAG, "onLocationResult: ${locationResult.locations.size}")
-                for(location in locationResult.locations){
-                    Log.d(TAG, "onLocationResult: "+"위도 ${location.latitude}" +
-                            "경도 ${location.longitude}" +
-                            "속도 ${location.speed}")
+                Log.d(TAG, "onLocationResult: ${locationResult.locations.size}")
+                for (location in locationResult.locations) {
+                    Log.d(
+                        TAG, "onLocationResult: " + "위도 ${location.latitude}" +
+                                "경도 ${location.longitude}" +
+                                "속도 ${location.speed}"
+                    )
+                    naverMap.let {
+                        val coord = LatLng(location)
+
+                        it.locationOverlay.isVisible = true
+                        it.locationOverlay.position = coord
+
+                        it.moveCamera(CameraUpdate.scrollTo(coord))
+                    }
                 }
             }
         }
     }
+
 
     lateinit var binding: ActivityMainBinding
 
@@ -113,9 +127,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
 
-    lateinit var cancellationTokenSource : CancellationTokenSource
-    
-    lateinit var pivotLocation :Marker
+    lateinit var cancellationTokenSource: CancellationTokenSource
+
+    lateinit var pivotLocation: Marker
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,25 +139,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 requesting = it.getBoolean(REQUESTING_CODE)
             }
         }
+
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
+        bindView()
+        initMap()
+
+    }
+
+    private fun bindView() {
         binding.compassTextView.setOnClickListener {
-//            cancellationTokenSource = CancellationTokenSource()
-//            fusedLocationClient.getCurrentLocation(LocationRequest.PRIORITY_HIGH_ACCURACY,cancellationTokenSource.token).addOnSuccessListener { location ->
-//                trafficLightMarkerList.forEach {
-//                    val temp = atan2(it.position.longitude - location.longitude,it.position.latitude-location.longitude).toDegree()
-//                }
-//            }
-            if(this::pivotLocation.isInitialized) pivotLocation.map = null
+            if (this::pivotLocation.isInitialized) pivotLocation.map = null
             pivotLocation = Marker(naverMap.cameraPosition.target)
             pivotLocation.map = naverMap
-            trafficLightMarkerList.forEach {
-                    val temp = atan2(it.position.longitude - pivotLocation.position.longitude,it.position.latitude- pivotLocation.position.latitude).toDegree()
-                    it.captionText = ((temp + 360)% 360).toString()
-                }
         }
 
         binding.trackingButton.setOnClickListener {
@@ -157,16 +169,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
         }
+    }
 
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-
+    private fun initMap() {
         val fm = supportFragmentManager
         val mapFragment = fm.findFragmentById(R.id.map) as MapFragment?
             ?: MapFragment.newInstance().also {
                 fm.beginTransaction().add(R.id.map, it).commit()
             }
         mapFragment.getMapAsync(this)
-
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -180,6 +191,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+        Log.d(TAG, "onAccuracyChanged: " + p0.toString())
+        Log.d(TAG, "onAccuracyChanged: $p1")
     }
 
     fun updateOrientationAngles() {
@@ -195,8 +208,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
         SensorManager.getOrientation(rotationMatrix, orientationAngles)
         // "mOrientationAngles" now has up-to-date information.
-        val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360) % 360).toInt()
+        val degree = atan(orientationAngles[0]).toDouble().toDegree()
         binding.compassTextView.text = degree.toString()
+
+        if(this::naverMap.isInitialized) {
+            naverMap.let { map ->
+                map.locationOverlay.bearing = degree.toFloat()
+                trafficLightMarkerList.forEach {
+                    val temp = atan2(
+                        it.position.longitude - map.locationOverlay.position.longitude,
+                        it.position.latitude - map.locationOverlay.position.latitude
+                    ).toDegree() - degree
+                    it.captionText = temp.toString()
+                }
+            }
+
+        }
+
     }
 
     override fun onResume() {
@@ -205,7 +233,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             sensorManager.registerListener(
                 this,
                 accelerometer,
-                SensorManager.SENSOR_DELAY_NORMAL,
                 SensorManager.SENSOR_DELAY_UI
             )
         }
@@ -213,7 +240,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             sensorManager.registerListener(
                 this,
                 magneticField,
-                SensorManager.SENSOR_DELAY_NORMAL,
                 SensorManager.SENSOR_DELAY_UI
             )
         }
@@ -225,10 +251,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     override fun onMapReady(naverMap: NaverMap) {
-        this.naverMap = naverMap
         naverMap.addOnCameraIdleListener {
             addMarkersWithInBound(naverMap.contentBounds)
         }
+        naverMap.apply {
+            locationOverlay.icon = OverlayImage.fromResource(com.naver.maps.map.R.drawable.navermap_default_location_overlay_sub_icon_cone)
+            locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
+            locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
+            locationOverlay.anchor = PointF(0.5f, 1f)
+        }
+        this.naverMap = naverMap
 
     }
 
@@ -247,7 +279,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     response?.let { addPolygonFromCrossWalkResponse(it) }
                     val trafficLights = repository.getTrafficLightInBound(bound)
                     removeTrafficLightMarker()
-                    trafficLights?.let{addMarkerFromTrafficLightResponse(trafficLights)}
+                    trafficLights?.let { addMarkerFromTrafficLightResponse(trafficLights) }
                     withContext(Dispatchers.Main) {
                         polygonList.forEach {
                             it.map = naverMap
@@ -287,7 +319,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    fun addMarkerFromTrafficLightResponse(response:TrafficLightResponse){
+    fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) {
         response.features?.forEach { feature ->
             if (feature.properties?.vIEWCDE != "002" || feature.properties.eVECDE != "001") return@forEach
             feature.properties.let {
@@ -299,7 +331,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                     it[0],
                                     it[1]
                                 ).toLatLng()
-                            ))
+                            )
+                        )
                     }
                 }
             }

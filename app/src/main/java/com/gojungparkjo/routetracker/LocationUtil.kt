@@ -73,5 +73,5 @@ private fun rad2deg(rad: Double): Double {
 }
 
 fun Double.toDegree():Double{
-    return this * 180.0 / Math.PI
+    return ((this * 180.0 / Math.PI) + 360) % 360
 }
