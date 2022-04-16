@@ -30,12 +30,14 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
+import com.naver.maps.map.LocationTrackingMode
 import com.naver.maps.map.MapFragment
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.Overlay
 import com.naver.maps.map.overlay.PolygonOverlay
+import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.LocalDateTime
@@ -48,7 +50,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val TAG = "MainActivity"
     private var tts: TextToSpeech? = null
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
+    // 네이버지도 fusedlocationsourece
+    private lateinit var locationSource: FusedLocationSource
     private val repository = RoadRepository()
     var currentSteps = 0
     val db = Firebase.firestore
@@ -71,6 +74,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 Toast.makeText(this, "위치 권한이 거부되었습니다.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+    // locationsource 퍼미션 ㅇ더어오기 추후 통합해야할듯??
+    override fun onRequestPermissionsResult(requestCode: Int,
+                                            permissions: Array<String>,
+                                            grantResults: IntArray) {
+        if (locationSource.onRequestPermissionsResult(requestCode, permissions,
+                grantResults)) {
+            if (!locationSource.isActivated) { // 권한 거부됨
+                naverMap.locationTrackingMode = LocationTrackingMode.None
+            }
+            return
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
     val stepPermissionRequest = fun (){
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),0)
@@ -132,9 +148,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
-
+        // 로케이션 관련 서비스 객체들
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
+        locationSource = FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
         binding.trackingButton.setOnClickListener {
             if (requesting) {
                 stopTracking()
@@ -214,7 +230,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             sensorManager.registerListener(
                 this,
                 stepDetect,
-                SensorManager.SENSOR_DELAY_GAME
+                SensorManager.SENSOR_DELAY_FASTEST
             )
         }
     }
@@ -226,6 +242,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     override fun onMapReady(naverMap: NaverMap) {
         this.naverMap = naverMap
+        naverMap.locationSource = locationSource
+        naverMap.locationTrackingMode = LocationTrackingMode.Face
         naverMap.addOnCameraIdleListener {
             addMarkersWithInBound(naverMap.contentBounds)
         }
@@ -386,7 +404,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
         }
+
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
         dig.show(this)
