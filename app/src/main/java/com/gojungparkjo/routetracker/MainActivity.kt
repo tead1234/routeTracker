@@ -34,6 +34,7 @@ import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.OverlayImage
 import com.naver.maps.map.overlay.PolygonOverlay
 import com.naver.maps.map.util.FusedLocationSource
+import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
@@ -215,11 +216,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             naverMap.let { map ->
                 map.locationOverlay.bearing = degree.toFloat()
                 trafficLightMarkerList.forEach {
-                    val temp = (atan2(
+                    val temp = atan2(
                         it.position.longitude - map.locationOverlay.position.longitude,
                         it.position.latitude - map.locationOverlay.position.latitude
-                    ) - degree).toDegree()
-                    it.captionText = temp.toInt().toString()
+                    ).toDegree()
+                    val diff = temp.toInt() - degree.toInt()
+                    it.captionText = "diff: $diff"
+                    it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
+                    it.icon = MarkerIcons.BLACK
+                }
+                polygonList.forEach { polygon ->
+                    var nearest = Double.MAX_VALUE
+                    var flag = false
+                    polygon.coords.forEach{
+                        val temp =it.distanceTo(map.locationOverlay.position)
+                        if(temp < nearest && temp < 10){
+                            nearest = temp
+                            val temp2 = atan2(
+                                it.longitude - map.locationOverlay.position.longitude,
+                                it.latitude - map.locationOverlay.position.latitude
+                            ).toDegree()
+                            val diff = temp2.toInt() - degree.toInt()
+                            flag = diff in -20..20
+                        }
+                    }
+                    polygon.color = if(flag) Color.RED else Color.WHITE
                 }
             }
 
