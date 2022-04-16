@@ -19,6 +19,7 @@
         <fragment android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:id="@+id/map"
+            tools:visibility="gone"
             android:name="com.naver.maps.map.MapFragment" />
     </androidx.constraintlayout.widget.ConstraintLayout>
     <ProgressBar
