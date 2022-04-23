@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     OnMapReadyCallback {
     private val TAG = "MainActivity"
     private var tts: TextToSpeech? = null
+    private var text = ""
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     // 네이버지도 fusedlocationsourece
     private lateinit var locationSource: FusedLocationSource
@@ -90,7 +91,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                             grantResults: IntArray) {
         if (locationSource.onRequestPermissionsResult(requestCode, permissions,
                 grantResults)) {
-            if (!locationSource.isActivated) { // 권한 거부됨
+            if (!locationSource.isActivated) { // //권한 거부됨
                 naverMap.locationTrackingMode = LocationTrackingMode.None
             }
             return
@@ -193,8 +194,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 }
             }
         })
-//            buttonSpeak = findViewById(R.id.mic)
-//            tv = findViewById(R.id.endingMessage)
+
 
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
@@ -243,12 +243,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
             if(event.values[0]==1.0f){
                 currentSteps ++;
-                binding.trackingSteps.text =currentSteps.toString()
+                binding.trackingSteps.setText(currentSteps.toString())
             }
         }
         updateOrientationAngles()
     }
-
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
         Log.d(TAG, "onAccuracyChanged: " + p0.toString())
         Log.d(TAG, "onAccuracyChanged: $p1")
@@ -499,14 +498,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         val REQUESTING_CODE = "100"
         }
     // tts part
-    private fun speakOut() {
-        val text = "우리어플을 평가해주세요"
-        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null,"")
-    }
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
         dig.show(this)
         speakOut()
+    }
+    private fun speakOut() {
+        text = "우리어플을 평가해주세요"
+        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null,"")
     }
 }
 
