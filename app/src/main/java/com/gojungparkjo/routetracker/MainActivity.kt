@@ -91,7 +91,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                             grantResults: IntArray) {
         if (locationSource.onRequestPermissionsResult(requestCode, permissions,
                 grantResults)) {
-            if (!locationSource.isActivated) { // 권한 거부됨
+            if (!locationSource.isActivated) { // /권한 거부됨
                 naverMap.locationTrackingMode = LocationTrackingMode.None
             }
             return
