@@ -19,8 +19,20 @@
         <fragment android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:id="@+id/map"
+            tools:visibility="gone"
             android:name="com.naver.maps.map.MapFragment" />
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <TextView
+        android:id="@+id/trackingSteps"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_gray_transparent_bg"
+        android:textColor="#000000"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/map_view"
+        app:layout_constraintTop_toTopOf="@id/map_view"
+        tools:text="걸음수" />
     <ProgressBar
         android:layout_width="35dp"
         android:layout_height="35dp"

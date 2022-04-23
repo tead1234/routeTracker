@@ -3,6 +3,7 @@ package com.gojungparkjo.routetracker.model
 import android.app.Dialog
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -15,9 +16,24 @@ class FeedBackDialog(private val context : AppCompatActivity) {
 
     private lateinit var binding : FeedbackdialogBinding
     private val dlg = Dialog(context)   //부모 액티비티의 context 가 들어감
-    private val tts = TTS_Module()
 //    private lateinit var listener : Feedbackdialog
-
+//    tts = TextToSpeech(this, TextToSpeech.OnInitListener {
+//        fun onInit(status: Int) {
+//            if (status == TextToSpeech.SUCCESS) {
+//                // set US English as language for tts
+//                val result = tts!!.setLanguage(Locale.US)
+//
+//                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                    Log.e("TTS","The Language specified is not supported!")
+//                } else {
+//                    buttonSpeak!!.isEnabled = true
+//                }
+//
+//            } else {
+//                Log.e("TTS", "Initilization Failed!")
+//            }
+//        }
+//    })
     fun show(content: MainActivity) {
         binding = FeedbackdialogBinding.inflate(context.layoutInflater)
 
@@ -29,6 +45,7 @@ class FeedBackDialog(private val context : AppCompatActivity) {
         //ok 버튼 동작
         binding.yesBtn.setOnClickListener {
 //            ActivityCompat.finishAffinity(this)
+
             dlg.dismiss()
             exitProcess(0)
 
@@ -36,10 +53,7 @@ class FeedBackDialog(private val context : AppCompatActivity) {
 
         //cancel 버튼 동작
         binding.mic.setOnClickListener {
-//            TTS_Module.onInit(TextToSpeech.SUCCESS)
-//            TTS_Module.toSpeech(context,"우리어플 평가좀", Locale.KOREA
-//                ,PITCH.NOMAL.level
-//                ,SPEED.s1_0X.speed )
+//
             dlg.dismiss()
         }
 
