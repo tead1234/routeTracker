@@ -2,6 +2,7 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
@@ -12,7 +13,9 @@ import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -79,27 +82,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             @SuppressLint("SetTextI18n")
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
-                for (location in locationResult.locations) {
-                    binding.textView.setText(
-                        "위도 ${location.latitude}" +
-                                "경도 ${location.longitude}" +
-                                "속도 ${location.speed}"
-                    )
-//                    db.collection(android.os.Build.MODEL)
-//                        .document(LocalDateTime.now(ZoneId.of("JST")).format(dateTimeFormatter))
-//                        .set(mapOf(Pair("lat", location.latitude), Pair("lng", location.longitude)))
-//                        .addOnSuccessListener {
-//                            Toast.makeText(applicationContext, "위치 정보 기록됨", Toast.LENGTH_SHORT)
-//                                .show()
-//                        }
-                }
+
                 Log.d(TAG, "onLocationResult: ${locationResult.locations.size}")
                 for (location in locationResult.locations) {
-                    Log.d(
-                        TAG, "onLocationResult: " + "위도 ${location.latitude}" +
-                                "경도 ${location.longitude}" +
-                                "속도 ${location.speed}"
-                    )
                     naverMap.let {
                         val coord = LatLng(location)
 
@@ -196,6 +181,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         Log.d(TAG, "onAccuracyChanged: $p1")
     }
 
+    var colorJob :Job? = null
+
     fun updateOrientationAngles() {
         // Update rotation matrix, which is needed to update orientation angles.
         SensorManager.getRotationMatrix(
@@ -212,38 +199,45 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360) % 360)
         binding.compassTextView.text = degree.toInt().toString()
 
-        if (this::naverMap.isInitialized) {
-            naverMap.let { map ->
-                map.locationOverlay.bearing = degree.toFloat()
-                trafficLightMarkerList.forEach {
-                    val temp = atan2(
-                        it.position.longitude - map.locationOverlay.position.longitude,
-                        it.position.latitude - map.locationOverlay.position.latitude
-                    ).toDegree()
-                    val diff = temp.toInt() - degree.toInt()
-                    it.captionText = "diff: $diff"
-                    it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
-                    it.icon = MarkerIcons.BLACK
-                }
-                polygonList.forEach { polygon ->
-                    var nearest = Double.MAX_VALUE
-                    var flag = false
-                    polygon.coords.forEach{
-                        val temp =it.distanceTo(map.locationOverlay.position)
-                        if(temp < nearest && temp < 10){
-                            nearest = temp
-                            val temp2 = atan2(
-                                it.longitude - map.locationOverlay.position.longitude,
-                                it.latitude - map.locationOverlay.position.latitude
-                            ).toDegree()
-                            val diff = temp2.toInt() - degree.toInt()
-                            flag = diff in -20..20
-                        }
-                    }
-                    polygon.color = if(flag) Color.RED else Color.WHITE
-                }
-            }
+        if (job?.isActive == true) return
 
+        if (this::naverMap.isInitialized) {
+            colorJob?.let{
+                if(it.isActive) return
+            }
+            colorJob = MainScope().launch {
+                naverMap.let { map ->
+                    map.locationOverlay.bearing = degree.toFloat()
+                    trafficLightMarkerList.forEach {
+                        val temp = atan2(
+                            it.position.longitude - map.locationOverlay.position.longitude,
+                            it.position.latitude - map.locationOverlay.position.latitude
+                        ).toDegree()
+                        val diff = temp.toInt() - degree.toInt()
+                        it.captionText = "diff: $diff"
+                        it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
+                        it.icon = MarkerIcons.BLACK
+                    }
+                    polygonList.forEach { polygon ->
+                        var nearest = Double.MAX_VALUE
+                        var flag = false
+                        polygon.coords.forEach {
+                            val temp = it.distanceTo(map.locationOverlay.position)
+                            if (temp < nearest && temp < 10) {
+                                nearest = temp
+                                val temp2 = atan2(
+                                    it.longitude - map.locationOverlay.position.longitude,
+                                    it.latitude - map.locationOverlay.position.latitude
+                                ).toDegree()
+                                val diff = temp2.toInt() - degree.toInt()
+                                flag = diff in -20..20
+                            }
+                        }
+                        polygon.color = if (flag) Color.RED else Color.WHITE
+                    }
+                }
+
+            }
         }
 
     }
@@ -290,6 +284,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         job?.let {
             if (it.isActive) it.cancel()
         }
+        colorJob?.let{ if(it.isActive) it.cancel() }
         job = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
             withContext(Dispatchers.Default) {
