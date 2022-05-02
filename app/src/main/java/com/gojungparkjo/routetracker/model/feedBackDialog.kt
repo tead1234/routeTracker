@@ -44,11 +44,9 @@ class FeedBackDialog(private val context : AppCompatActivity) {
 
         //ok 버튼 동작
         binding.yesBtn.setOnClickListener {
-//            ActivityCompat.finishAffinity(this)
-
             dlg.dismiss()
+            ActivityCompat.finishAffinity(context)
             exitProcess(0)
-
         }
 
         //cancel 버튼 동작
