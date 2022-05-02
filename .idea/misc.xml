@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/Users/tead1/AndroidStudioProjects/routeTracker/app/src/main/res/layout/activity_main.xml" value="0.30413385826771655" />
+        <entry key="..\:/Users/tead1/AndroidStudioProjects/routeTracker/app/src/main/res/layout/feedbackdialog.xml" value="0.1609375" />
+      </map>
+    </option>
+  </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="ProjectRootManager" version="2" languageLevel="JDK_16" project-jdk-name="16" project-jdk-type="JavaSDK" />
 </project>

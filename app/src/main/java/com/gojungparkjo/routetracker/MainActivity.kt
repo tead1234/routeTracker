@@ -10,19 +10,26 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
+import com.gojungparkjo.routetracker.model.FeedBackDialog
+import com.gojungparkjo.routetracker.model.TTS_Module
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.google.android.gms.location.*
@@ -41,6 +48,7 @@ import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
+import java.util.*
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.atanh
@@ -48,16 +56,19 @@ import kotlin.math.atanh
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
     OnMapReadyCallback {
-
     private val TAG = "MainActivity"
-
+//    private var tts: TextToSpeech? = null
+//    private var text = ""
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
+    // 네이버지도 fusedlocationsourece
+    private lateinit var locationSource: FusedLocationSource
     private val repository = RoadRepository()
-
+    private var buttonSpeak: Button? = null
+    private var tv: TextView? = null
+    var currentSteps = 0
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
-
+    lateinit var tts : TTS_Module
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -76,15 +87,51 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
     }
+    // locationsource 퍼미션 ㅇ더어오기 추후 통합해야할듯??
+    override fun onRequestPermissionsResult(requestCode: Int,
+                                            permissions: Array<String>,
+                                            grantResults: IntArray) {
+        if (locationSource.onRequestPermissionsResult(requestCode, permissions,
+                grantResults)) {
+            if (!locationSource.isActivated) { // //권한 거부됨
+                naverMap.locationTrackingMode = LocationTrackingMode.None
+            }
+            return
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+    val stepPermissionRequest = fun (){
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),0)
+        Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
+    }
+
 
     val locationCallback by lazy {
         object : LocationCallback() {
             @SuppressLint("SetTextI18n")
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
-
+                for (location in locationResult.locations) {
+                    binding.textView.setText(
+                        "위도 ${location.latitude}" +
+                                "경도 ${location.longitude}" +
+                                "속도 ${location.speed}"
+                    )
+//                    db.collection(android.os.Build.MODEL)
+//                        .document(LocalDateTime.now(ZoneId.of("JST")).format(dateTimeFormatter))
+//                        .set(mapOf(Pair("lat", location.latitude), Pair("lng", location.longitude)))
+//                        .addOnSuccessListener {
+//                            Toast.makeText(applicationContext, "위치 정보 기록됨", Toast.LENGTH_SHORT)
+//                                .show()
+//                        }
+                }
                 Log.d(TAG, "onLocationResult: ${locationResult.locations.size}")
                 for (location in locationResult.locations) {
+                    Log.d(
+                        TAG, "onLocationResult: " + "위도 ${location.latitude}" +
+                                "경도 ${location.longitude}" +
+                                "속도 ${location.speed}"
+                    )
                     naverMap.let {
                         val coord = LatLng(location)
 
@@ -127,6 +174,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 requesting = it.getBoolean(REQUESTING_CODE)
             }
         }
+        // 그지같은놈 초기화
+//        tts = TextToSpeech(this, TextToSpeech.OnInitListener {
+//            fun onInit(status: Int) {
+//                if (status == TextToSpeech.SUCCESS) {
+//                    // set US English as language for tts
+//                    val result = tts!!.setLanguage(Locale.US)
+//
+//                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                        Log.e("TTS","The Language specified is not supported!")
+//                    } else {
+//                        buttonSpeak!!.isEnabled = true
+//                    }
+//
+//                } else {
+//                    Log.e("TTS", "Initilization Failed!")
+//                }
+//            }
+//        })
+        tts = TTS_Module(this)
+
 
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
@@ -172,6 +239,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
         } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
+        }else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
+            if(event.values[0]==1.0f){
+                currentSteps ++;
+                binding.trackingSteps.setText(currentSteps.toString())
+            }
         }
         updateOrientationAngles()
     }
@@ -256,6 +328,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 this,
                 magneticField,
                 SensorManager.SENSOR_DELAY_UI
+            )
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
+            sensorManager.registerListener(
+                this,
+                stepDetect,
+                SensorManager.SENSOR_DELAY_FASTEST
             )
         }
     }
@@ -421,5 +500,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
+        }
+    // tts part
+    override fun onBackPressed() {
+        val dig = FeedBackDialog(this)
+        dig.show(this)
+        tts.speakOut("우리 어플을 평가해주세요")
     }
+//    private fun speakOut() {
+//        text = "우리어플을 평가해주세요"
+//        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null,"")
+//    }
 }
+
+
+
+
