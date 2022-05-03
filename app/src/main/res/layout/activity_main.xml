@@ -85,5 +85,14 @@
         android:text="걸음수"
         android:textSize="40sp"
         />
+    <androidx.appcompat.widget.SwitchCompat
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="@id/map_view"
+        app:layout_constraintBottom_toBottomOf="@id/map_view"
+        android:layout_margin="8dp"
+        android:id="@+id/tracking_switch"
+        android:background="@color/gray_a70"
+        />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
