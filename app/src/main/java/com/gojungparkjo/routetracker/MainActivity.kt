@@ -41,6 +41,7 @@ import com.naver.maps.map.overlay.PolygonOverlay
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
@@ -444,6 +445,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     Manifest.permission.ACCESS_FINE_LOCATION
                 )
             )
+        }
+        if(ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_DENIED){
+            stepPermissionRequest()
         }
     }
 
