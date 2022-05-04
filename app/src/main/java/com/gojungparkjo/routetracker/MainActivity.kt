@@ -173,6 +173,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         setContentView(binding.root)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        locationSource = FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         bindView()
@@ -478,6 +479,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
     }
 
     // tts part
