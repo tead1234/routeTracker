@@ -116,6 +116,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         "위도 ${location.latitude}" +
                                 "경도 ${location.longitude}" +
                                 "속도 ${location.speed}"
+                     +"걸음수${currentSteps}"
                     )
 //                    db.collection(android.os.Build.MODEL)
 //                        .document(LocalDateTime.now(ZoneId.of("JST")).format(dateTimeFormatter))
@@ -242,6 +243,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
             if(event.values[0]==1.0f){
                 currentSteps ++;
+                Toast.makeText(this, "${currentSteps.toString()}", Toast.LENGTH_SHORT).show()
                 binding.trackingSteps.setText(currentSteps.toString())
             }
         }
@@ -254,7 +256,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     var colorJob :Job? = null
-
+        // 거리 측정함수가 하나 더 필요할거 같음
     fun updateOrientationAngles() {
         // Update rotation matrix, which is needed to update orientation angles.
         SensorManager.getRotationMatrix(
@@ -287,7 +289,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         ).toDegree()
                         val diff = temp.toInt() - degree.toInt()
                         it.captionText = "diff: $diff"
-                        it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
+                        // 일단 충무로 1번 신호등 위치를 찾아와서 거기에만 태그를 달아야함
+                        if(diff in -20..20){
+                            it.iconTintColor = Color.BLACK
+                            it.tag = "가장 가까운 신호등입니다"
+                            tts.speakOut(it.tag.toString())
+                        }else{
+                            Color.GREEN
+                        }
+//                        it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
                         it.icon = MarkerIcons.BLACK
                     }
                     polygonList.forEach { polygon ->
@@ -323,18 +333,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 SensorManager.SENSOR_DELAY_UI
             )
         }
+        sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
+            sensorManager.registerListener(
+                this,
+                stepDetect,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        }
         sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.also { magneticField ->
             sensorManager.registerListener(
                 this,
                 magneticField,
                 SensorManager.SENSOR_DELAY_UI
-            )
-        }
-        sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
-            sensorManager.registerListener(
-                this,
-                stepDetect,
-                SensorManager.SENSOR_DELAY_FASTEST
             )
         }
     }
@@ -507,10 +517,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         dig.show(this)
         tts.speakOut("우리 어플을 평가해주세요")
     }
-//    private fun speakOut() {
-//        text = "우리어플을 평가해주세요"
-//        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null,"")
-//    }
 }
 
 

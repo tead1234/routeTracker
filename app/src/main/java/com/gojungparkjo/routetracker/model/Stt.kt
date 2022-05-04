@@ -6,7 +6,6 @@ import android.speech.SpeechRecognizer;
 
 class STT {
     val intent: Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-    
 }
 
 
