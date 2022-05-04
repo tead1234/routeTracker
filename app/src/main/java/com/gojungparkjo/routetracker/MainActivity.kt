@@ -2,7 +2,6 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
@@ -10,14 +9,10 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Build
 import android.os.Bundle
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
-import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -46,20 +41,20 @@ import com.naver.maps.map.overlay.PolygonOverlay
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
-import java.util.*
-import kotlin.math.atan
 import kotlin.math.atan2
-import kotlin.math.atanh
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
     OnMapReadyCallback {
     private val TAG = "MainActivity"
-//    private var tts: TextToSpeech? = null
+
+    //    private var tts: TextToSpeech? = null
 //    private var text = ""
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
     // 네이버지도 fusedlocationsourece
     private lateinit var locationSource: FusedLocationSource
     private val repository = RoadRepository()
@@ -68,7 +63,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     var currentSteps = 0
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
-    lateinit var tts : TTS_Module
+    lateinit var tts: TTS_Module
+    lateinit var compass: Compass
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -87,12 +83,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
     }
+
     // locationsource 퍼미션 ㅇ더어오기 추후 통합해야할듯??
-    override fun onRequestPermissionsResult(requestCode: Int,
-                                            permissions: Array<String>,
-                                            grantResults: IntArray) {
-        if (locationSource.onRequestPermissionsResult(requestCode, permissions,
-                grantResults)) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        if (locationSource.onRequestPermissionsResult(
+                requestCode, permissions,
+                grantResults
+            )
+        ) {
             if (!locationSource.isActivated) { // //권한 거부됨
                 naverMap.locationTrackingMode = LocationTrackingMode.None
             }
@@ -100,8 +102,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
-    val stepPermissionRequest = fun (){
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),0)
+
+    val stepPermissionRequest = fun() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+            0
+        )
         Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
     }
 
@@ -117,28 +124,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 "경도 ${location.longitude}" +
                                 "속도 ${location.speed}"
                     )
-//                    db.collection(android.os.Build.MODEL)
-//                        .document(LocalDateTime.now(ZoneId.of("JST")).format(dateTimeFormatter))
-//                        .set(mapOf(Pair("lat", location.latitude), Pair("lng", location.longitude)))
-//                        .addOnSuccessListener {
-//                            Toast.makeText(applicationContext, "위치 정보 기록됨", Toast.LENGTH_SHORT)
-//                                .show()
-//                        }
                 }
-                Log.d(TAG, "onLocationResult: ${locationResult.locations.size}")
                 for (location in locationResult.locations) {
-                    Log.d(
-                        TAG, "onLocationResult: " + "위도 ${location.latitude}" +
-                                "경도 ${location.longitude}" +
-                                "속도 ${location.speed}"
-                    )
                     naverMap.let {
                         val coord = LatLng(location)
 
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coord
 
-                        it.moveCamera(CameraUpdate.scrollTo(coord))
+                        if (binding.trackingSwitch.isChecked) it.moveCamera(
+                            CameraUpdate.scrollTo(
+                                coord
+                            )
+                        )
                     }
                 }
             }
@@ -155,11 +153,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     var job: Job? = null
 
     lateinit var sensorManager: SensorManager
-    private val accelerometerReading = FloatArray(3)
-    private val magnetometerReading = FloatArray(3)
-
-    private val rotationMatrix = FloatArray(9)
-    private val orientationAngles = FloatArray(3)
 
     lateinit var cancellationTokenSource: CancellationTokenSource
 
@@ -174,26 +167,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 requesting = it.getBoolean(REQUESTING_CODE)
             }
         }
-        // 그지같은놈 초기화
-//        tts = TextToSpeech(this, TextToSpeech.OnInitListener {
-//            fun onInit(status: Int) {
-//                if (status == TextToSpeech.SUCCESS) {
-//                    // set US English as language for tts
-//                    val result = tts!!.setLanguage(Locale.US)
-//
-//                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-//                        Log.e("TTS","The Language specified is not supported!")
-//                    } else {
-//                        buttonSpeak!!.isEnabled = true
-//                    }
-//
-//                } else {
-//                    Log.e("TTS", "Initilization Failed!")
-//                }
-//            }
-//        })
         tts = TTS_Module(this)
-
 
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
@@ -203,9 +177,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
         bindView()
         initMap()
+        setupCompass()
 
     }
 
+    private fun setupCompass() {
+        compass = Compass(this)
+        compass.setListener(object : Compass.CompassListener {
+            override fun onNewAzimuth(degree: Float) {
+                binding.compassTextView.text = degree.toInt().toString()
+                paintTrafficSignAndCrosswalkInSight(degree.toDouble())
+            }
+        })
+    }
+
+    var ep = 0.000011
     private fun bindView() {
         binding.compassTextView.setOnClickListener {
             naverMap.locationOverlay.position = naverMap.cameraPosition.target
@@ -235,17 +221,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
-        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
-        } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
-            System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
-        }else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
-            if(event.values[0]==1.0f){
-                currentSteps ++;
+        if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
+            if (event.values[0] == 1.0f) {
+                currentSteps++;
                 binding.trackingSteps.setText(currentSteps.toString())
             }
         }
-        updateOrientationAngles()
     }
 
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
@@ -253,29 +234,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         Log.d(TAG, "onAccuracyChanged: $p1")
     }
 
-    var colorJob :Job? = null
+    var colorJob: Job? = null
 
-    fun updateOrientationAngles() {
-        // Update rotation matrix, which is needed to update orientation angles.
-        SensorManager.getRotationMatrix(
-            rotationMatrix,
-            null,
-            accelerometerReading,
-            magnetometerReading
-        )
-
-        // "mRotationMatrix" now has up-to-date information.
-
-        SensorManager.getOrientation(rotationMatrix, orientationAngles)
-        // "mOrientationAngles" now has up-to-date information.
-        val degree = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360) % 360)
-        binding.compassTextView.text = degree.toInt().toString()
-
+    private fun paintTrafficSignAndCrosswalkInSight(degree: Double) {
         if (job?.isActive == true) return
 
         if (this::naverMap.isInitialized) {
-            colorJob?.let{
-                if(it.isActive) return
+            colorJob?.let {
+                if (it.isActive) return
             }
             colorJob = MainScope().launch {
                 naverMap.let { map ->
@@ -286,9 +252,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             it.position.latitude - map.locationOverlay.position.latitude
                         ).toDegree()
                         val diff = temp.toInt() - degree.toInt()
+                        val dist = it.position.distanceTo(map.locationOverlay.position)
                         it.captionText = "diff: $diff"
-                        it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
+                        it.iconTintColor = if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
                         it.icon = MarkerIcons.BLACK
+                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
+                            tts.speakOut(it.tag.toString())
+                        }
                     }
                     polygonList.forEach { polygon ->
                         var nearest = Double.MAX_VALUE
@@ -311,25 +281,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
             }
         }
-
     }
 
     override fun onResume() {
         super.onResume()
-        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also { accelerometer ->
-            sensorManager.registerListener(
-                this,
-                accelerometer,
-                SensorManager.SENSOR_DELAY_UI
-            )
-        }
-        sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.also { magneticField ->
-            sensorManager.registerListener(
-                this,
-                magneticField,
-                SensorManager.SENSOR_DELAY_UI
-            )
-        }
+        compass.start()
         sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
             sensorManager.registerListener(
                 this,
@@ -339,9 +295,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        compass.start()
+    }
+
     override fun onPause() {
         super.onPause()
+        compass.stop()
         sensorManager.unregisterListener(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        compass.stop()
     }
 
     override fun onMapReady(naverMap: NaverMap) {
@@ -363,7 +330,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         job?.let {
             if (it.isActive) it.cancel()
         }
-        colorJob?.let{ if(it.isActive) it.cancel() }
+        colorJob?.let { if (it.isActive) it.cancel() }
         job = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
             withContext(Dispatchers.Default) {
@@ -410,25 +377,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             binding.infoTextView.visibility = View.VISIBLE
                             true
                         }
+                    }.also {
+                        Log.d(TAG, "call convex hull")
+                        polygonList.add(it.getConvexHull().apply {
+                            color = Color.TRANSPARENT
+                            outlineColor = Color.RED
+                            outlineWidth = 5
+                            zIndex = 20000
+                        })
                     })
                 }
             }
         }
     }
 
-    fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) {
+    suspend fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) {
         response.features?.forEach { feature ->
             if (feature.properties?.vIEWCDE != "002" || feature.properties.eVECDE != "001") return@forEach
-            feature.properties.let {
-                if (it.sNLPKNDCDE == "007" && it.xCE != null && it.yCE != null) {
+            feature.properties.let { property ->
+                if (property.sNLPKNDCDE == "007" && property.xCE != null && property.yCE != null) {
                     feature.geometry?.coordinates?.first {
+                        val info = db.collection("trafficSignGuideInfo").document(property.mGRNU!!).get().await()
                         trafficLightMarkerList.add(
                             Marker(
                                 ProjCoordinate(
                                     it[0],
                                     it[1]
                                 ).toLatLng()
-                            )
+                            ).apply {
+                                tag = info.get("line")?:"신호등 정보가 없습니다."
+                            }
                         )
                     }
                 }
@@ -500,7 +478,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
-        }
+    }
+
     // tts part
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
