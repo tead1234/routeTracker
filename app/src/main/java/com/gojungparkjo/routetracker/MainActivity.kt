@@ -252,10 +252,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             it.position.latitude - map.locationOverlay.position.latitude
                         ).toDegree()
                         val diff = temp.toInt() - degree.toInt()
+                        val dist = it.position.distanceTo(map.locationOverlay.position)
                         it.captionText = "diff: $diff"
-                        it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
+                        it.iconTintColor = if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
                         it.icon = MarkerIcons.BLACK
-                        if (diff in -20..20 && tts.tts.isSpeaking.not()) {
+                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
                             tts.speakOut(it.tag.toString())
                         }
                     }
