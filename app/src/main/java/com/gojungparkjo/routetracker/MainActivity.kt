@@ -9,6 +9,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -43,6 +44,13 @@ import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
+import org.opencv.android.OpenCVLoader
+import org.opencv.core.Core
+import org.opencv.core.Point
+import org.opencv.core.Rect
+import org.opencv.imgproc.Imgproc
+import org.opencv.osgi.OpenCVNativeLoader
+import java.math.BigDecimal
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
 
@@ -379,12 +387,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             true
                         }
                     }.also {
-                        Log.d(TAG, "call convex hull")
-                        polygonList.add(it.getConvexHull().apply {
-                            color = Color.TRANSPARENT
+                        polygonList.add(it.minAreaRect().apply {
                             outlineColor = Color.RED
                             outlineWidth = 5
                             zIndex = 20000
+                            setOnClickListener { it.map = null; true }
                         })
                     })
                 }

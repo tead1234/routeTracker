@@ -1,16 +1,27 @@
 package com.gojungparkjo.routetracker
 
 import android.util.Log
-import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
-import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.overlay.PolygonOverlay
-import org.locationtech.proj4j.ProjCoordinate
+import org.opencv.core.MatOfPoint2f
+import org.opencv.imgproc.Imgproc
 import java.math.BigDecimal
 import java.util.*
+import kotlin.math.pow
+
+fun PolygonOverlay.minAreaRect(): PolygonOverlay {
+    val scale = 10.0.pow(11)
+    val points = this.coords.map { org.opencv.core.Point(it.latitude*scale,it.longitude*scale) }
+    val mat = MatOfPoint2f()
+    mat.fromList(points)
+    val rectangle = Imgproc.minAreaRect(mat)
+    val rectanglePoints = Array<org.opencv.core.Point?>(4){null}
+    rectangle.points(rectanglePoints)
+    return PolygonOverlay(rectanglePoints.toList().map { LatLng(it!!.x/scale,it.y/scale) })
+}
 
 fun PolygonOverlay.getSimplified(ep:Double) = PolygonOverlay(RamerDouglasPeucker.douglasPeucker(
-    this.coords.toList().map { arrayOf(it.latitude.toBigDecimal(), it.longitude.toBigDecimal()) }, ep.toBigDecimal()
+    this.getConvexHull().coords.toList().map { arrayOf(it.latitude.toBigDecimal(), it.longitude.toBigDecimal()) }, ep.toBigDecimal()
 ).map { LatLng(it[0].toDouble(), it[1].toDouble()) })
 
 typealias Point = Pair<BigDecimal, BigDecimal>

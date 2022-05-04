@@ -31,7 +31,6 @@ object RamerDouglasPeucker {
         wy: BigDecimal
     ): BigDecimal {
         val l2 = distanceBetweenPoints(vx, vy, wx, wy)
-        Log.d("TAG", "distanceToSegmentSquared: ${l2.toString()}")
         if (l2 == BigDecimal.ZERO) return distanceBetweenPoints(px, py, vx, vy)
         val t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2
         if (t < BigDecimal.ZERO) return distanceBetweenPoints(px, py, vx, vy)
@@ -109,8 +108,8 @@ object RamerDouglasPeucker {
     }
 }
 
-private val SQRT_DIG = BigDecimal(1000)
-private val SQRT_PRE = BigDecimal(10).pow(SQRT_DIG.toInt())
+private val SQRT_DIG = BigDecimal(150)
+private val SQRT_PRE = BigDecimal.TEN.pow(SQRT_DIG.toInt())
 
 /**
  * Private utility method used to compute the square root of a BigDecimal.
