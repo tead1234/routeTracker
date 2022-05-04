@@ -41,20 +41,20 @@ import com.naver.maps.map.overlay.PolygonOverlay
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
-import java.util.*
-import kotlin.math.atan
 import kotlin.math.atan2
-import kotlin.math.atanh
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
     OnMapReadyCallback {
     private val TAG = "MainActivity"
-//    private var tts: TextToSpeech? = null
+
+    //    private var tts: TextToSpeech? = null
 //    private var text = ""
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
     // 네이버지도 fusedlocationsourece
     private lateinit var locationSource: FusedLocationSource
     private val repository = RoadRepository()
@@ -63,8 +63,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     var currentSteps = 0
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
-    lateinit var tts : TTS_Module
-    lateinit var compass : Compass
+    lateinit var tts: TTS_Module
+    lateinit var compass: Compass
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -83,12 +83,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
     }
+
     // locationsource 퍼미션 ㅇ더어오기 추후 통합해야할듯??
-    override fun onRequestPermissionsResult(requestCode: Int,
-                                            permissions: Array<String>,
-                                            grantResults: IntArray) {
-        if (locationSource.onRequestPermissionsResult(requestCode, permissions,
-                grantResults)) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        if (locationSource.onRequestPermissionsResult(
+                requestCode, permissions,
+                grantResults
+            )
+        ) {
             if (!locationSource.isActivated) { // //권한 거부됨
                 naverMap.locationTrackingMode = LocationTrackingMode.None
             }
@@ -96,8 +102,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
-    val stepPermissionRequest = fun (){
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),0)
+
+    val stepPermissionRequest = fun() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+            0
+        )
         Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
     }
 
@@ -121,7 +132,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coord
 
-                        if(binding.trackingSwitch.isChecked) it.moveCamera(CameraUpdate.scrollTo(coord))
+                        if (binding.trackingSwitch.isChecked) it.moveCamera(
+                            CameraUpdate.scrollTo(
+                                coord
+                            )
+                        )
                     }
                 }
             }
@@ -168,7 +183,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private fun setupCompass() {
         compass = Compass(this)
-        compass.setListener(object:Compass.CompassListener{
+        compass.setListener(object : Compass.CompassListener {
             override fun onNewAzimuth(degree: Float) {
                 binding.compassTextView.text = degree.toInt().toString()
                 paintTrafficSignAndCrosswalkInSight(degree.toDouble())
@@ -176,6 +191,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         })
     }
 
+    var ep = 0.000011
     private fun bindView() {
         binding.compassTextView.setOnClickListener {
             naverMap.locationOverlay.position = naverMap.cameraPosition.target
@@ -206,8 +222,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
         if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
-            if(event.values[0]==1.0f){
-                currentSteps ++;
+            if (event.values[0] == 1.0f) {
+                currentSteps++;
                 binding.trackingSteps.setText(currentSteps.toString())
             }
         }
@@ -218,7 +234,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         Log.d(TAG, "onAccuracyChanged: $p1")
     }
 
-    var colorJob :Job? = null
+    var colorJob: Job? = null
 
     private fun paintTrafficSignAndCrosswalkInSight(degree: Double) {
         if (job?.isActive == true) return
@@ -240,7 +256,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.iconTintColor = if (diff in -20..20) Color.BLACK else Color.GREEN
                         it.icon = MarkerIcons.BLACK
                         if (diff in -20..20 && tts.tts.isSpeaking.not()) {
-                            tts.speakOut("감지되었습니다.")
+                            tts.speakOut(it.tag.toString())
                         }
                     }
                     polygonList.forEach { polygon ->
@@ -313,7 +329,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         job?.let {
             if (it.isActive) it.cancel()
         }
-        colorJob?.let{ if(it.isActive) it.cancel() }
+        colorJob?.let { if (it.isActive) it.cancel() }
         job = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
             withContext(Dispatchers.Default) {
@@ -360,25 +376,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             binding.infoTextView.visibility = View.VISIBLE
                             true
                         }
+                    }.also {
+                        Log.d(TAG, "call convex hull")
+                        polygonList.add(it.getConvexHull().apply {
+                            color = Color.TRANSPARENT
+                            outlineColor = Color.RED
+                            outlineWidth = 5
+                            zIndex = 20000
+                        })
                     })
                 }
             }
         }
     }
 
-    fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) {
+    suspend fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) {
         response.features?.forEach { feature ->
             if (feature.properties?.vIEWCDE != "002" || feature.properties.eVECDE != "001") return@forEach
-            feature.properties.let {
-                if (it.sNLPKNDCDE == "007" && it.xCE != null && it.yCE != null) {
+            feature.properties.let { property ->
+                if (property.sNLPKNDCDE == "007" && property.xCE != null && property.yCE != null) {
                     feature.geometry?.coordinates?.first {
+                        val info = db.collection("trafficSignGuideInfo").document(property.mGRNU!!).get().await()
                         trafficLightMarkerList.add(
                             Marker(
                                 ProjCoordinate(
                                     it[0],
                                     it[1]
                                 ).toLatLng()
-                            )
+                            ).apply {
+                                tag = info.get("line")?:"신호등 정보가 없습니다."
+                            }
                         )
                     }
                 }
@@ -450,7 +477,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     companion object {
         val REQUESTING_CODE = "100"
-        }
+    }
+
     // tts part
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
