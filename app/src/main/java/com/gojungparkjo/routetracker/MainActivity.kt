@@ -9,7 +9,6 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -44,13 +43,6 @@ import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
-import org.opencv.android.OpenCVLoader
-import org.opencv.core.Core
-import org.opencv.core.Point
-import org.opencv.core.Rect
-import org.opencv.imgproc.Imgproc
-import org.opencv.osgi.OpenCVNativeLoader
-import java.math.BigDecimal
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
 
@@ -263,7 +255,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         val diff = temp.toInt() - degree.toInt()
                         val dist = it.position.distanceTo(map.locationOverlay.position)
                         it.captionText = "diff: $diff"
-                        it.iconTintColor = if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
+                        it.iconTintColor =
+                            if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
                         it.icon = MarkerIcons.BLACK
                         if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
                             tts.speakOut(it.tag.toString())
@@ -386,14 +379,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             binding.infoTextView.visibility = View.VISIBLE
                             true
                         }
-                    }.also {
-                        polygonList.add(it.minAreaRect().apply {
+                    }
+                        .also {
+                        polygonList.add(it.orientedMinimumBoundingBox().apply {
+                            color = Color.TRANSPARENT
                             outlineColor = Color.RED
-                            outlineWidth = 5
+                            outlineWidth = 2
                             zIndex = 20000
                             setOnClickListener { it.map = null; true }
                         })
-                    })
+                    }
+                    )
                 }
             }
         }
@@ -405,7 +401,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             feature.properties.let { property ->
                 if (property.sNLPKNDCDE == "007" && property.xCE != null && property.yCE != null) {
                     feature.geometry?.coordinates?.first {
-                        val info = db.collection("trafficSignGuideInfo").document(property.mGRNU!!).get().await()
+                        val info =
+                            db.collection("trafficSignGuideInfo").document(property.mGRNU!!).get()
+                                .await()
                         trafficLightMarkerList.add(
                             Marker(
                                 ProjCoordinate(
@@ -413,7 +411,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                     it[1]
                                 ).toLatLng()
                             ).apply {
-                                tag = info.get("line")?:"신호등 정보가 없습니다."
+                                tag = info.get("line") ?: "신호등 정보가 없습니다."
                             }
                         )
                     }
