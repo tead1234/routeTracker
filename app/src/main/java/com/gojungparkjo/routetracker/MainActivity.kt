@@ -399,6 +399,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 )
             )
         }
+        if(ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_DENIED){
+            stepPermissionRequest()
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -427,6 +431,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
 
+    @SuppressLint("MissingPermission")
     override fun onResume() {
         super.onResume()
         compass.start()
