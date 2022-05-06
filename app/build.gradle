@@ -40,6 +40,9 @@ android {
 }
 
 dependencies {
+
+    implementation 'org.locationtech.jts:jts-core:1.18.2'
+
     implementation 'ch.obermuhlner:big-math:2.3.0'
 
     implementation 'com.naver.maps:map-sdk:3.14.0'

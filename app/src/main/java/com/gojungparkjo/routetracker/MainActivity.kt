@@ -319,14 +319,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
                             .also {
-                                polygonMap[feature.properties.mGRNU + "X"] =
-                                    it.orientedMinimumBoundingBox().apply {
-                                        color = Color.TRANSPARENT
-                                        outlineColor = Color.RED
-                                        outlineWidth = 2
-                                        zIndex = 20000
-                                        setOnClickListener { it.map = null; true }
-                                    }
+                                it.minimumRectangle().let{
+                                    polygonMap[feature.properties.mGRNU + "X"] =
+                                        it.apply {
+                                            color = Color.TRANSPARENT
+                                            outlineColor = Color.RED
+                                            outlineWidth = 2
+                                            zIndex = 20000
+                                            setOnClickListener { it.map = null; true }
+                                        }
+                                }
                             }
                     }
                 }

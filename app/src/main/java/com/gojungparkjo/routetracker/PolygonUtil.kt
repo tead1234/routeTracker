@@ -3,6 +3,9 @@ package com.gojungparkjo.routetracker
 import ch.obermuhlner.math.big.DefaultBigDecimalMath
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.overlay.PolygonOverlay
+import org.locationtech.jts.algorithm.MinimumDiameter
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
 import java.math.BigDecimal
 import java.util.*
 
@@ -243,3 +246,6 @@ fun PolygonArea(polygon: Array<Point>, N: Int): BigDecimal {
     area /= 2.0.toBigDecimal()
     return area.abs()
 }
+
+fun PolygonOverlay.minimumRectangle(): PolygonOverlay =
+    PolygonOverlay((MinimumDiameter(GeometryFactory().createPolygon(this.coords.map { Coordinate(it.latitude,it.longitude) }.toTypedArray())).minimumRectangle).coordinates.map { LatLng(it.x,it.y) })
