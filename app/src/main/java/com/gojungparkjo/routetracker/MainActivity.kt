@@ -9,6 +9,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -40,6 +41,7 @@ import com.naver.maps.map.overlay.OverlayImage
 import com.naver.maps.map.overlay.PolygonOverlay
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
+import com.ppsoln.obslib.ObsCalculater
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
@@ -174,7 +176,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-
         bindView()
         initMap()
         setupCompass()
@@ -357,6 +358,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
             binding.loadingView.visibility = View.GONE
         }
+          val obs= ObsCalculater()
+
 
     }
 
