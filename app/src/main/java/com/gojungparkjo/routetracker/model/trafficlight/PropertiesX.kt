@@ -35,7 +35,7 @@ data class PropertiesX(
     @SerializedName("HISID")
     val hISID: Int?,
     @SerializedName("MGRNU")
-    val mGRNU: String?,
+    val mGRNU: String,
     @SerializedName("MK_CPY")
     val mKCPY: Any?,
     @SerializedName("MNG_AGEN")

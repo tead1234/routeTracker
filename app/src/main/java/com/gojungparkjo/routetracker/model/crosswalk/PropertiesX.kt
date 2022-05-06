@@ -35,7 +35,7 @@ data class PropertiesX(
     @SerializedName("JIBUN")
     val jIBUN: String?,
     @SerializedName("MGRNU")
-    val mGRNU: String?,
+    val mGRNU: String,
     @SerializedName("MNG_AGEN")
     val mNGAGEN: Any?,
     @SerializedName("NW_PE_CDE")
