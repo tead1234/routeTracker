@@ -9,6 +9,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.GnssMeasurementRequest
+import android.location.GnssMeasurementsEvent
 import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
@@ -47,6 +49,8 @@ import kotlinx.coroutines.tasks.await
 import org.locationtech.proj4j.ProjCoordinate
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
+import android.location.GnssMeasurement
+
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -63,10 +67,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private var buttonSpeak: Button? = null
     private var tv: TextView? = null
     var currentSteps = 0
+    lateinit var gns: GnssMeasurementsEvent
     val db = Firebase.firestore
     val dateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd-hhmmss.S")
     lateinit var tts: TTS_Module
     lateinit var compass: Compass
+    lateinit var obs:ObsCalculater
     val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -155,7 +161,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     var job: Job? = null
 
     lateinit var sensorManager: SensorManager
-
+    lateinit var locationManager: LocationManager
     lateinit var cancellationTokenSource: CancellationTokenSource
 
     private val polygonList = mutableListOf<PolygonOverlay>()
@@ -177,6 +183,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationSource = FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        locationManager = getSystemService(LOCATION_SERVICE)as LocationManager
+        locationManager.registerGnssMeasurementsCallback(object : GnssMeasurementsEvent.Callback(){
+            override fun onGnssMeasurementsReceived(eventArgs: GnssMeasurementsEvent?) {
+                super.onGnssMeasurementsReceived(eventArgs)
+                if (eventArgs != null) {
+                    gns =  eventArgs.measurements
+                    obs.staType(gns)
+                }
+            }
+
+            override fun onStatusChanged(status: Int) {
+                super.onStatusChanged(status)
+            }
+        })
         bindView()
         initMap()
         setupCompass()
