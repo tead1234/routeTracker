@@ -38,6 +38,7 @@ import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
 import kotlin.collections.HashMap
@@ -288,16 +289,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         if (addShapeJob.isActive) addShapeJob.cancel()
         MainScope().launch {
             binding.loadingView.visibility = View.VISIBLE
-            fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@ {
+            fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
                 if (bound == null) return@fetch
-                val crossWalkResponse = repository.getRoadInBound(bound)
-                crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
                 val trafficLights = repository.getTrafficLightInBound(bound)
                 trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
                 val pedestrianRoadResponse = repository.getPedestrianRoadInBound(bound)
                 pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 val trafficIslandResponse = repository.getTrafficIslandInBound(bound)
                 trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+                val crossWalkResponse = repository.getRoadInBound(bound)
+                crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
             }
             fetchAndMakeJob.join()
             addShapesWithInBound(bound)
@@ -305,7 +306,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse)=
+    private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse) =
         withContext(Dispatchers.Default) {
             response.features?.forEach { feature ->
                 if (feature.properties?.vIEWCDE != "002" || pedestrianRoadMap.containsKey(
@@ -369,34 +370,71 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //                                        }
 //                                }
                                     .also {
-                                    val temp = it.coords.map { Coordinate(it.latitude,it.longitude) }
-                                    val middlePoints = mutableListOf<LatLng>()
-                                    for (i in 0 until temp.size-1){
-                                        val middlePoint = LineSegment.midPoint(temp[i],temp[i+1])
-                                        middlePoints.add(LatLng(middlePoint.x,middlePoint.y))
+                                        val temp = it.coords.map { it.toCoordinate() }
+                                        val middlePoints = mutableListOf<LatLng>()
+                                        for (i in 0 until temp.size - 1) {
+                                            val middlePoint =
+                                                LineSegment.midPoint(temp[i], temp[i + 1])
+                                            middlePoints.add(middlePoint.toLatLng())
 
-                                    }
-                                    val delta = 0.00003
-                                    val midLine1 = lengthenLine(middlePoints[0],middlePoints[2],delta)
-                                    val midLine2 = lengthenLine(middlePoints[1],middlePoints[3],delta)
+                                        }
+                                        val delta = 0.00003
+                                        val midLine1 =
+                                            lengthenLine(middlePoints[0], middlePoints[2], delta)
+                                        val midLine2 =
+                                            lengthenLine(middlePoints[1], middlePoints[3], delta)
 
-                                    polylineMap[feature.properties.mGRNU+"L1"]= PolylineOverlay(midLine1).apply {
-                                        zIndex = 20003
-                                        setOnClickListener { it.map = null; true }
-                                    }
-                                    polylineMap[feature.properties.mGRNU+"L2"]= PolylineOverlay(midLine2).apply {
-                                        zIndex = 20003
-                                        setOnClickListener { it.map = null; true }
-                                    }
+                                        val geometryFactory = GeometryFactory()
+                                        val midLine1Geometry = LineSegment(
+                                            midLine1[0].toCoordinate(),
+                                            midLine1[1].toCoordinate()
+                                        ).toGeometry(geometryFactory)
+                                        val midLine2Geometry = LineSegment(
+                                            midLine2[0].toCoordinate(),
+                                            midLine2[1].toCoordinate()
+                                        ).toGeometry(geometryFactory)
 
-                                    polygonMap[feature.properties.mGRNU + "DIA"] = PolygonOverlay(middlePoints).apply {
-                                        color = Color.TRANSPARENT
-                                        outlineColor = Color.BLACK
-                                        outlineWidth = 5
-                                        zIndex = 20001
-                                        setOnClickListener { it.map = null; true }
+                                        var midLine1Intersect = 0
+                                        var midLine2Intersect = 0
+
+                                        withContext(Dispatchers.Main) {
+                                            pedestrianRoadMap.forEach { _, polygon ->
+                                                val polygonBoundary =
+                                                    geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
+                                                        .toTypedArray()).boundary
+                                                if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
+                                                if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
+                                            }
+                                        }
+                                        Log.d(
+                                            TAG,
+                                            "addPolygonFromCrossWalkResponse: $midLine1Intersect $midLine2Intersect"
+                                        )
+
+                                        polylineMap[feature.properties.mGRNU + "L1"] =
+                                            PolylineOverlay(midLine1).apply {
+                                                zIndex = 20003
+                                                if (midLine1Intersect > midLine2Intersect) color =
+                                                    Color.MAGENTA
+                                                setOnClickListener { it.map = null; true }
+                                            }
+                                        polylineMap[feature.properties.mGRNU + "L2"] =
+                                            PolylineOverlay(midLine2).apply {
+                                                zIndex = 20003
+                                                if (midLine1Intersect < midLine2Intersect) color =
+                                                    Color.MAGENTA
+                                                setOnClickListener { it.map = null; true }
+                                            }
+
+                                        polygonMap[feature.properties.mGRNU + "DIA"] =
+                                            PolygonOverlay(middlePoints).apply {
+                                                color = Color.TRANSPARENT
+                                                outlineColor = Color.BLACK
+                                                outlineWidth = 5
+                                                zIndex = 20001
+                                                setOnClickListener { it.map = null; true }
+                                            }
                                     }
-                                }
                             }
                     }
                 }
@@ -445,7 +483,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 crosswalk.map = if (bound.contains(crosswalk.bounds)) naverMap else null
             }
             pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
-                pedestrianRoad.map = if (bound.contains(pedestrianRoad.bounds)||bound.intersects(pedestrianRoad.bounds)) naverMap else null
+                pedestrianRoad.map =
+                    if (bound.contains(pedestrianRoad.bounds) || bound.intersects(pedestrianRoad.bounds)) naverMap else null
             }
             trafficLightMap.forEach { (_, trafficLight) ->
                 trafficLight.map = if (bound.contains(trafficLight.position)) naverMap else null
@@ -473,8 +512,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 )
             )
         }
-        if(ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_DENIED){
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_DENIED
+        ) {
             stepPermissionRequest()
         }
     }

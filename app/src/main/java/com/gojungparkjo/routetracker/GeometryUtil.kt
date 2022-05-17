@@ -1,6 +1,7 @@
 package com.gojungparkjo.routetracker
 
 import com.naver.maps.geometry.LatLng
+import org.locationtech.jts.geom.Coordinate
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -11,3 +12,6 @@ fun lengthenLine(p1:LatLng,p2:LatLng,delta:Double):List<LatLng>{
     val newPoint2 = LatLng(p2.latitude + (delta*sin(angle)),p2.longitude+(delta*cos(angle)))
     return listOf(newPoint1,newPoint2)
 }
+
+fun LatLng.toCoordinate() = Coordinate(latitude,longitude)
+fun Coordinate.toLatLng() = LatLng(x,y)
