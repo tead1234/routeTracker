@@ -10,6 +10,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
@@ -30,16 +31,18 @@ import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.*
-import com.naver.maps.map.overlay.LocationOverlay
-import com.naver.maps.map.overlay.Marker
-import com.naver.maps.map.overlay.OverlayImage
-import com.naver.maps.map.overlay.PolygonOverlay
+import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
+import kotlin.collections.HashMap
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -272,6 +275,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     private val polygonMap = HashMap<String, PolygonOverlay>()
+    private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
 
     private var fetchAndMakeJob = Job().job
@@ -319,15 +323,45 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
                             .also {
-                                it.minimumRectangle().let{
-                                    polygonMap[feature.properties.mGRNU + "X"] =
-                                        it.apply {
-                                            color = Color.TRANSPARENT
-                                            outlineColor = Color.RED
-                                            outlineWidth = 2
-                                            zIndex = 20000
-                                            setOnClickListener { it.map = null; true }
-                                        }
+                                it.minimumRectangle()
+//                                    .also{
+//                                    polygonMap[feature.properties.mGRNU + "X"] =
+//                                        it.apply {
+//                                            color = Color.TRANSPARENT
+//                                            outlineColor = Color.RED
+//                                            outlineWidth = 2
+//                                            zIndex = 20000
+//                                            setOnClickListener { it.map = null; true }
+//                                        }
+//                                }
+                                    .also {
+                                    val temp = it.coords.map { Coordinate(it.latitude,it.longitude) }
+                                    val middlePoints = mutableListOf<LatLng>()
+                                    for (i in 0 until temp.size-1){
+                                        val middlePoint = LineSegment.midPoint(temp[i],temp[i+1])
+                                        middlePoints.add(LatLng(middlePoint.x,middlePoint.y))
+
+                                    }
+                                    val delta = 0.00003
+                                    val midLine1 = lengthenLine(middlePoints[0],middlePoints[2],delta)
+                                    val midLine2 = lengthenLine(middlePoints[1],middlePoints[3],delta)
+
+                                    polylineMap[feature.properties.mGRNU+"L1"]= PolylineOverlay(midLine1).apply {
+                                        zIndex = 20003
+                                        setOnClickListener { it.map = null; true }
+                                    }
+                                    polylineMap[feature.properties.mGRNU+"L2"]= PolylineOverlay(midLine2).apply {
+                                        zIndex = 20003
+                                        setOnClickListener { it.map = null; true }
+                                    }
+
+                                    polygonMap[feature.properties.mGRNU + "DIA"] = PolygonOverlay(middlePoints).apply {
+                                        color = Color.TRANSPARENT
+                                        outlineColor = Color.BLACK
+                                        outlineWidth = 5
+                                        zIndex = 20001
+                                        setOnClickListener { it.map = null; true }
+                                    }
                                 }
                             }
                     }
@@ -378,6 +412,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
             trafficLightMap.forEach { (_, trafficLight) ->
                 trafficLight.map = if (bound.contains(trafficLight.position)) naverMap else null
+            }
+            polylineMap.forEach { (_, polyline) ->
+                polyline.map = if (bound.contains(polyline.bounds)) naverMap else null
             }
 
             binding.loadingView.visibility = View.GONE
