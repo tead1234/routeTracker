@@ -10,7 +10,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
@@ -37,14 +36,11 @@ import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
-import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
 import kotlin.collections.HashMap
 import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -347,7 +343,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         list.add(ProjCoordinate(point[0], point[1]).toLatLng())
                     }
                     if (list.size > 2) {
-                        polygonMap[feature.properties.mGRNU] = PolygonOverlay().apply {
+                        val crossWalkPolygon = PolygonOverlay().apply {
                             coords = list; color = Color.WHITE
                             outlineWidth = 5; outlineColor = Color.GREEN
                             tag = feature.properties.toString()
@@ -357,84 +353,73 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 true
                             }
                         }
-                            .also {
-                                it.minimumRectangle()
-//                                    .also{
-//                                    polygonMap[feature.properties.mGRNU + "X"] =
-//                                        it.apply {
-//                                            color = Color.TRANSPARENT
-//                                            outlineColor = Color.RED
-//                                            outlineWidth = 2
-//                                            zIndex = 20000
-//                                            setOnClickListener { it.map = null; true }
-//                                        }
-//                                }
-                                    .also {
-                                        val temp = it.coords.map { it.toCoordinate() }
-                                        val middlePoints = mutableListOf<LatLng>()
-                                        for (i in 0 until temp.size - 1) {
-                                            val middlePoint =
-                                                LineSegment.midPoint(temp[i], temp[i + 1])
-                                            middlePoints.add(middlePoint.toLatLng())
+                        polygonMap[feature.properties.mGRNU] = crossWalkPolygon
 
-                                        }
-                                        val delta = 0.00003
-                                        val midLine1 =
-                                            lengthenLine(middlePoints[0], middlePoints[2], delta)
-                                        val midLine2 =
-                                            lengthenLine(middlePoints[1], middlePoints[3], delta)
+                        // 최소 사각형
+                        val rectanglePolygon = crossWalkPolygon.minimumRectangle()
+                        // 사각형 꼭짓점
+                        val rectangleCoord = rectanglePolygon.coords.map { it.toCoordinate() }
+                        // 각 변의 중점 찾기
+                        val middlePoints = mutableListOf<LatLng>()
+                        for (i in 0 until rectangleCoord.size - 1) {
+                            val middlePoint =
+                                LineSegment.midPoint(rectangleCoord[i], rectangleCoord[i + 1])
+                            middlePoints.add(middlePoint.toLatLng())
 
-                                        val geometryFactory = GeometryFactory()
-                                        val midLine1Geometry = LineSegment(
-                                            midLine1[0].toCoordinate(),
-                                            midLine1[1].toCoordinate()
-                                        ).toGeometry(geometryFactory)
-                                        val midLine2Geometry = LineSegment(
-                                            midLine2[0].toCoordinate(),
-                                            midLine2[1].toCoordinate()
-                                        ).toGeometry(geometryFactory)
+                        }
+                        // 중심선 잇고 늘이기
+                        val delta = 0.00003
+                        val midLine1 =
+                            lengthenLine(middlePoints[0], middlePoints[2], delta)
+                        val midLine2 =
+                            lengthenLine(middlePoints[1], middlePoints[3], delta)
 
-                                        var midLine1Intersect = 0
-                                        var midLine2Intersect = 0
+                        val geometryFactory = GeometryFactory()
+                        val midLine1Geometry = LineSegment(
+                            midLine1[0].toCoordinate(),
+                            midLine1[1].toCoordinate()
+                        ).toGeometry(geometryFactory)
+                        val midLine2Geometry = LineSegment(
+                            midLine2[0].toCoordinate(),
+                            midLine2[1].toCoordinate()
+                        ).toGeometry(geometryFactory)
 
-                                        withContext(Dispatchers.Main) {
-                                            pedestrianRoadMap.forEach { _, polygon ->
-                                                val polygonBoundary =
-                                                    geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
-                                                        .toTypedArray()).boundary
-                                                if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
-                                                if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
-                                            }
-                                        }
-                                        Log.d(
-                                            TAG,
-                                            "addPolygonFromCrossWalkResponse: $midLine1Intersect $midLine2Intersect"
-                                        )
+                        // 중심선과 도보 교차 계산
+                        var midLine1Intersect = 0
+                        var midLine2Intersect = 0
 
-                                        polylineMap[feature.properties.mGRNU + "L1"] =
-                                            PolylineOverlay(midLine1).apply {
-                                                zIndex = 20003
-                                                if (midLine1Intersect > midLine2Intersect) color =
-                                                    Color.MAGENTA
-                                                setOnClickListener { it.map = null; true }
-                                            }
-                                        polylineMap[feature.properties.mGRNU + "L2"] =
-                                            PolylineOverlay(midLine2).apply {
-                                                zIndex = 20003
-                                                if (midLine1Intersect < midLine2Intersect) color =
-                                                    Color.MAGENTA
-                                                setOnClickListener { it.map = null; true }
-                                            }
+                        withContext(Dispatchers.Main) {
+                            pedestrianRoadMap.forEach { _, polygon ->
+                                val polygonBoundary =
+                                    geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
+                                        .toTypedArray()).boundary
+                                if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
+                                if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
+                            }
+                        }
 
-                                        polygonMap[feature.properties.mGRNU + "DIA"] =
-                                            PolygonOverlay(middlePoints).apply {
-                                                color = Color.TRANSPARENT
-                                                outlineColor = Color.BLACK
-                                                outlineWidth = 5
-                                                zIndex = 20001
-                                                setOnClickListener { it.map = null; true }
-                                            }
-                                    }
+                        polylineMap[feature.properties.mGRNU + "L1"] =
+                            PolylineOverlay(midLine1).apply {
+                                zIndex = 20003
+                                if (midLine1Intersect > midLine2Intersect) color =
+                                    Color.MAGENTA
+                                setOnClickListener { it.map = null; true }
+                            }
+                        polylineMap[feature.properties.mGRNU + "L2"] =
+                            PolylineOverlay(midLine2).apply {
+                                zIndex = 20003
+                                if (midLine1Intersect < midLine2Intersect) color =
+                                    Color.MAGENTA
+                                setOnClickListener { it.map = null; true }
+                            }
+
+                        polygonMap[feature.properties.mGRNU + "DIA"] =
+                            PolygonOverlay(middlePoints).apply {
+                                color = Color.TRANSPARENT
+                                outlineColor = Color.BLACK
+                                outlineWidth = 5
+                                zIndex = 20001
+                                setOnClickListener { it.map = null; true }
                             }
                     }
                 }
