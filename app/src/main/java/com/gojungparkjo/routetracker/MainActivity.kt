@@ -24,6 +24,7 @@ import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.gojungparkjo.routetracker.model.FeedBackDialog
 import com.gojungparkjo.routetracker.model.TTS_Module
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
+import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
@@ -275,6 +276,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     private val polygonMap = HashMap<String, PolygonOverlay>()
+    private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
 
@@ -291,13 +293,45 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 val crossWalkResponse = repository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
                 val trafficLights = repository.getTrafficLightInBound(bound)
-                trafficLights?.let { addMarkerFromTrafficLightResponse(trafficLights) }
+                trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
+                val pedestrianRoadResponse = repository.getPedestrianRoadInBound(bound)
+                pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+                val trafficIslandResponse = repository.getTrafficIslandInBound(bound)
+                trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
             }
             fetchAndMakeJob.join()
             addShapesWithInBound(bound)
             binding.loadingView.visibility = View.INVISIBLE
         }
     }
+
+    private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse)=
+        withContext(Dispatchers.Default) {
+            response.features?.forEach { feature ->
+                if (feature.properties?.vIEWCDE != "002" || pedestrianRoadMap.containsKey(
+                        feature.properties.mGRNU
+                    )
+                ) return@forEach
+                feature.geometry?.coordinates?.forEach {
+                    val list = mutableListOf<LatLng>()
+                    it.forEach { point ->
+                        list.add(ProjCoordinate(point[0], point[1]).toLatLng())
+                    }
+                    if (list.size > 2) {
+                        pedestrianRoadMap[feature.properties.mGRNU] = PolygonOverlay().apply {
+                            coords = list; color = Color.WHITE
+                            outlineWidth = 5; outlineColor = Color.RED
+                            tag = feature.properties.toString()
+                            setOnClickListener {
+                                binding.infoTextView.text = it.tag.toString()
+                                binding.infoTextView.visibility = View.VISIBLE
+                                true
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
     private suspend fun addPolygonFromCrossWalkResponse(response: CrossWalkResponse) =
         withContext(Dispatchers.Default) {
@@ -409,6 +443,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
             polygonMap.forEach { (_, crosswalk) ->
                 crosswalk.map = if (bound.contains(crosswalk.bounds)) naverMap else null
+            }
+            pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
+                pedestrianRoad.map = if (bound.contains(pedestrianRoad.bounds)||bound.intersects(pedestrianRoad.bounds)) naverMap else null
             }
             trafficLightMap.forEach { (_, trafficLight) ->
                 trafficLight.map = if (bound.contains(trafficLight.position)) naverMap else null
