@@ -413,14 +413,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 setOnClickListener { it.map = null; true }
                             }
 
-                        polygonMap[feature.properties.mGRNU + "DIA"] =
-                            PolygonOverlay(middlePoints).apply {
-                                color = Color.TRANSPARENT
-                                outlineColor = Color.BLACK
-                                outlineWidth = 5
-                                zIndex = 20001
-                                setOnClickListener { it.map = null; true }
-                            }
                     }
                 }
             }
