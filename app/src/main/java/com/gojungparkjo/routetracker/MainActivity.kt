@@ -169,7 +169,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         compass.setListener(object : Compass.CompassListener {
             override fun onNewAzimuth(azimuth: Float) {
                 binding.compassTextView.text = azimuth.toInt().toString()
-                paintTrafficSignAndCrosswalkInSight(azimuth.toDouble())
+                findTrafficSignAndCrosswalkInSight(azimuth.toDouble())
             }
         })
     }
@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private var colorJob = Job().job
 
-    private fun paintTrafficSignAndCrosswalkInSight(degree: Double) {
+    private fun findTrafficSignAndCrosswalkInSight(degree: Double) {
         if (fetchAndMakeJob.isActive) return
         if (this::naverMap.isInitialized) {
             if (colorJob.isActive) return
@@ -253,10 +253,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             tts.speakOut(trafficLight.tag.toString())
                         }
                     }
+                   // var nearestInterSection:Triple<PolygonOverlay,Pair<LatLng,LatLng>,Pair<String,String>>? = null
                     polygonMap.forEach { (_, polygon) ->
                         var nearest = Double.MAX_VALUE
                         var flag = false
-                        polygon.coords.forEach {
+                        var direct: String = ""
+                        polygon.first.coords.forEach {
                             val temp = it.distanceTo(map.locationOverlay.position)
                             if (temp < nearest && temp < 10) {
                                 nearest = temp
@@ -266,14 +268,42 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 ).toDegree()
                                 val diff = temp2.toInt() - degree.toInt()
                                 flag = diff in -20..20
+                                if(flag) {
+                                   var nearestInterSection = polygon
+                                    var temp3 = atan2(nearestInterSection.second.first.longitude - map.locationOverlay.position.longitude,
+                                        nearestInterSection.second.first.latitude - map.locationOverlay.position.latitude).toDouble()
+                                    var temp4 = atan2(nearestInterSection.second.second.longitude - map.locationOverlay.position.longitude,
+                                        nearestInterSection.second.second.latitude - map.locationOverlay.position.latitude).toDouble()
+                                    if(temp3 >= temp4){
+                                        direct = nearestInterSection.third.first.toString()
+                                        Log.d(TAG, "방면: $direct")
+                                    }else{
+                                        direct = nearestInterSection.third.second.toString()
+                                        Log.d(TAG, "방면: $direct")
+                                    }
+                                }
+                                if (polygon.first.tag != null){
+                                    // csscde
+                                    var crossWalk = interSectionMap[polygon.first.tag.toString()]
+                                    Log.d(TAG, "사거리: $crossWalk")
+                                    var anonunce = "${direct}방면 ${crossWalk}교차로 횡단보도입니다."
+                                    tts.speakOut(anonunce)
+
+                                }
+                                // 지금 이게 가장 가까운 횡단보도를 캐치한거니깐
+                                // 여기에서 폴리곤의 second와 나의  거리를 캐치하고 가장 가까운 seond를 찾아서
+                                // 그값이 second의 첫번쨰인지 두번쨰인지를 확인
+                                // 첫번째면 third의 두번쨰를
+                                // 두번째면 third의 첫번쨰를 return
+
                             }
                         }
-                        polygon.color = if (flag) {
-                            var intersectionName = interSectionMap[]
-                            var anounce = `${}교차로 횡단보도입니다.`
-                            Color.RED
-                        }
-                            else Color.WHITE
+                        polygon.first.color = if (flag) Color.RED else Color.WHITE
+                        // 교차
+
+
+                        // 랜드마크
+                        // 만약에 second의 첫번째면 third의 두번째를
 
                     }
                 }
@@ -282,7 +312,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    private val polygonMap = HashMap<String, PolygonOverlay>()
+    private val polygonMap = HashMap<String, Triple<PolygonOverlay,Pair<LatLng,LatLng>,Pair<String,String>>>()
     private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
@@ -358,14 +388,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         val crossWalkPolygon = PolygonOverlay().apply {
                             coords = list; color = Color.WHITE
                             outlineWidth = 5; outlineColor = Color.GREEN
-                            tag = feature.properties.toString()
+                            tag = feature.properties.cSSCDE.toString()
                             setOnClickListener {
                                 binding.infoTextView.text = it.tag.toString()
                                 binding.infoTextView.visibility = View.VISIBLE
                                 true
                             }
                         }
-                        polygonMap[feature.properties.mGRNU] = crossWalkPolygon
 
                         // 최소 사각형
                         val rectanglePolygon = crossWalkPolygon.minimumRectangle()
@@ -410,21 +439,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
 
+                        var mainMidLine:List<LatLng>
+                        var label1 :String
+                        var label2 :String
+
                         if(midLine1Intersect>midLine2Intersect){
-                            val newMidLine1 = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[1])
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                            mainMidLine = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
+
                         }else if(midLine1Intersect<midLine2Intersect){
-                            val newMidLine2 = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[1])
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                            mainMidLine = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                        }else{
+                            val midPoint = LineSegment.midPoint(middlePoints[0].toCoordinate(),middlePoints[2].toCoordinate()).toLatLng()
+                            mainMidLine = listOf(midPoint,midPoint)
                         }
+
+                        label1 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[0])?.poiInfo?.name?:""
+                        label2 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[1])?.poiInfo?.name?:""
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label1")
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label2")
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+
+                        polygonMap[feature.properties.mGRNU] = Triple(crossWalkPolygon,Pair(mainMidLine[0],mainMidLine[1]),Pair(label1,label2))
 
                         polylineMap[feature.properties.mGRNU + "L1"] =
                             PolylineOverlay(midLine1).apply {
@@ -498,7 +533,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
 
             polygonMap.forEach { (_, crosswalk) ->
-                crosswalk.map = if (bound.contains(crosswalk.bounds)) naverMap else null
+                crosswalk.first.map = if (bound.contains(crosswalk.first.bounds)) naverMap else null
             }
             pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
                 pedestrianRoad.map =
