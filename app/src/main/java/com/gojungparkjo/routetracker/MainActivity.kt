@@ -23,6 +23,7 @@ import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.gojungparkjo.routetracker.model.FeedBackDialog
 import com.gojungparkjo.routetracker.model.TTS_Module
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
+import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.google.android.gms.location.*
 import com.google.firebase.firestore.ktx.firestore
@@ -30,15 +31,15 @@ import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.*
-import com.naver.maps.map.overlay.LocationOverlay
-import com.naver.maps.map.overlay.Marker
-import com.naver.maps.map.overlay.OverlayImage
-import com.naver.maps.map.overlay.PolygonOverlay
+import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
+import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
+import kotlin.collections.HashMap
 import kotlin.math.atan2
 
 
@@ -272,6 +273,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     }
 
     private val polygonMap = HashMap<String, PolygonOverlay>()
+    private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
+    private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
 
     private var fetchAndMakeJob = Job().job
@@ -282,18 +285,50 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         if (addShapeJob.isActive) addShapeJob.cancel()
         MainScope().launch {
             binding.loadingView.visibility = View.VISIBLE
-            fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@ {
+            fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
                 if (bound == null) return@fetch
+                val trafficLights = repository.getTrafficLightInBound(bound)
+                trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
+                val pedestrianRoadResponse = repository.getPedestrianRoadInBound(bound)
+                pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+                val trafficIslandResponse = repository.getTrafficIslandInBound(bound)
+                trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 val crossWalkResponse = repository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
-                val trafficLights = repository.getTrafficLightInBound(bound)
-                trafficLights?.let { addMarkerFromTrafficLightResponse(trafficLights) }
             }
             fetchAndMakeJob.join()
             addShapesWithInBound(bound)
             binding.loadingView.visibility = View.INVISIBLE
         }
     }
+
+    private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse) =
+        withContext(Dispatchers.Default) {
+            response.features?.forEach { feature ->
+                if (feature.properties?.vIEWCDE != "002" || pedestrianRoadMap.containsKey(
+                        feature.properties.mGRNU
+                    )
+                ) return@forEach
+                feature.geometry?.coordinates?.forEach {
+                    val list = mutableListOf<LatLng>()
+                    it.forEach { point ->
+                        list.add(ProjCoordinate(point[0], point[1]).toLatLng())
+                    }
+                    if (list.size > 2) {
+                        pedestrianRoadMap[feature.properties.mGRNU] = PolygonOverlay().apply {
+                            coords = list; color = Color.WHITE
+                            outlineWidth = 5; outlineColor = Color.RED
+                            tag = feature.properties.toString()
+                            setOnClickListener {
+                                binding.infoTextView.text = it.tag.toString()
+                                binding.infoTextView.visibility = View.VISIBLE
+                                true
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
     private suspend fun addPolygonFromCrossWalkResponse(response: CrossWalkResponse) =
         withContext(Dispatchers.Default) {
@@ -308,7 +343,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         list.add(ProjCoordinate(point[0], point[1]).toLatLng())
                     }
                     if (list.size > 2) {
-                        polygonMap[feature.properties.mGRNU] = PolygonOverlay().apply {
+                        val crossWalkPolygon = PolygonOverlay().apply {
                             coords = list; color = Color.WHITE
                             outlineWidth = 5; outlineColor = Color.GREEN
                             tag = feature.properties.toString()
@@ -318,18 +353,66 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 true
                             }
                         }
-                            .also {
-                                it.minimumRectangle().let{
-                                    polygonMap[feature.properties.mGRNU + "X"] =
-                                        it.apply {
-                                            color = Color.TRANSPARENT
-                                            outlineColor = Color.RED
-                                            outlineWidth = 2
-                                            zIndex = 20000
-                                            setOnClickListener { it.map = null; true }
-                                        }
-                                }
+                        polygonMap[feature.properties.mGRNU] = crossWalkPolygon
+
+                        // 최소 사각형
+                        val rectanglePolygon = crossWalkPolygon.minimumRectangle()
+                        // 사각형 꼭짓점
+                        val rectangleCoord = rectanglePolygon.coords.map { it.toCoordinate() }
+                        // 각 변의 중점 찾기
+                        val middlePoints = mutableListOf<LatLng>()
+                        for (i in 0 until rectangleCoord.size - 1) {
+                            val middlePoint =
+                                LineSegment.midPoint(rectangleCoord[i], rectangleCoord[i + 1])
+                            middlePoints.add(middlePoint.toLatLng())
+
+                        }
+                        // 중심선 잇고 늘이기
+                        val delta = 0.00003
+                        val midLine1 =
+                            lengthenLine(middlePoints[0], middlePoints[2], delta)
+                        val midLine2 =
+                            lengthenLine(middlePoints[1], middlePoints[3], delta)
+
+                        val geometryFactory = GeometryFactory()
+                        val midLine1Geometry = LineSegment(
+                            midLine1[0].toCoordinate(),
+                            midLine1[1].toCoordinate()
+                        ).toGeometry(geometryFactory)
+                        val midLine2Geometry = LineSegment(
+                            midLine2[0].toCoordinate(),
+                            midLine2[1].toCoordinate()
+                        ).toGeometry(geometryFactory)
+
+                        // 중심선과 도보 교차 계산
+                        var midLine1Intersect = 0
+                        var midLine2Intersect = 0
+
+                        withContext(Dispatchers.Main) {
+                            pedestrianRoadMap.forEach { _, polygon ->
+                                val polygonBoundary =
+                                    geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
+                                        .toTypedArray()).boundary
+                                if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
+                                if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
                             }
+                        }
+
+                        polylineMap[feature.properties.mGRNU + "L1"] =
+                            PolylineOverlay(midLine1).apply {
+                                zIndex = 20003
+                                if (midLine1Intersect > midLine2Intersect) color =
+                                    Color.MAGENTA
+                                setOnClickListener { it.map = null; true }
+                            }
+                        polylineMap[feature.properties.mGRNU + "L2"] =
+                            PolylineOverlay(midLine2).apply {
+                                zIndex = 20003
+                                if (midLine1Intersect < midLine2Intersect) color =
+                                    Color.MAGENTA
+                                setOnClickListener { it.map = null; true }
+                            }
+
                     }
                 }
             }
@@ -376,8 +459,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             polygonMap.forEach { (_, crosswalk) ->
                 crosswalk.map = if (bound.contains(crosswalk.bounds)) naverMap else null
             }
+            pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
+                pedestrianRoad.map =
+                    if (bound.contains(pedestrianRoad.bounds) || bound.intersects(pedestrianRoad.bounds)) naverMap else null
+            }
             trafficLightMap.forEach { (_, trafficLight) ->
                 trafficLight.map = if (bound.contains(trafficLight.position)) naverMap else null
+            }
+            polylineMap.forEach { (_, polyline) ->
+                polyline.map = if (bound.contains(polyline.bounds)) naverMap else null
             }
 
             binding.loadingView.visibility = View.GONE
@@ -399,8 +489,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 )
             )
         }
-        if(ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_DENIED){
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_DENIED
+        ) {
             stepPermissionRequest()
         }
     }

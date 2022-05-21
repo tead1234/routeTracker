@@ -2,6 +2,7 @@ package com.gojungparkjo.routetracker.data
 
 import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
+import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.naver.maps.geometry.LatLngBounds
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,23 @@ class RoadRepository {
             val up = bound.northEast.toEPSG5186()
             val response =
                 roadService.getTrafficLightInBound("${low.x},${low.y},${up.x},${up.y},EPSG:5186")
+            response.body()
+        }
+
+    suspend fun getPedestrianRoadInBound(bound: LatLngBounds): PedestrianRoadResponse? =
+        withContext(Dispatchers.IO) {
+            val low = bound.southWest.toEPSG5186()
+            val up = bound.northEast.toEPSG5186()
+            val response =
+                roadService.getPedestrianRoadInBound("${low.x},${low.y},${up.x},${up.y},EPSG:5186")
+            response.body()
+        }
+    suspend fun getTrafficIslandInBound(bound: LatLngBounds): PedestrianRoadResponse? =
+        withContext(Dispatchers.IO) {
+            val low = bound.southWest.toEPSG5186()
+            val up = bound.northEast.toEPSG5186()
+            val response =
+                roadService.getTrafficIslandInBound("${low.x},${low.y},${up.x},${up.y},EPSG:5186")
             response.body()
         }
 }
