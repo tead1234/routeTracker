@@ -299,7 +299,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 val crossWalkResponse = roadRepository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
-                val InterSectionResponse = repository.getIntersectionInBound(bound)
+                val InterSectionResponse = roadRepository.getIntersectionInBound(bound)
                 InterSectionResponse?.let{getInterSectionNameInBound(it)}
             }
             fetchAndMakeJob.join()
