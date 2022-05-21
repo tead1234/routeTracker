@@ -1,6 +1,7 @@
 package com.gojungparkjo.routetracker.data
 
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
+import com.gojungparkjo.routetracker.model.intersection.InterSectionResponse
 import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import retrofit2.Response
@@ -19,4 +20,6 @@ interface RoadService {
 
     @GET("geoserver/seoul/wfs?request=GetFeature&version=1.1.1&typename=seoul%3AC080_A&outputFormat=application%2Fjson")
     suspend fun getTrafficIslandInBound(@Query("bbox") bound:String): Response<PedestrianRoadResponse>
+    @GET("geoserver/seoul/wfs?request=GetFeature&version=1.1.1&typename=seoul%3AA008_P&outputFormat=application%2Fjson")
+    suspend fun getIntersectionInBound(@Query("bbox") bound:String): Response<InterSectionResponse>
 }
