@@ -268,7 +268,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 flag = diff in -20..20
                             }
                         }
-                        polygon.color = if (flag) Color.RED else Color.WHITE
+                        polygon.color = if (flag) {
+                            var intersectionName = interSectionMap[]
+                            var anounce = `${}교차로 횡단보도입니다.`
+                            Color.RED
+                        }
+                            else Color.WHITE
+
                     }
                 }
 
