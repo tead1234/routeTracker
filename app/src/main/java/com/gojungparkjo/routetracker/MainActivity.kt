@@ -42,7 +42,6 @@ import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
-import kotlin.collections.HashMap
 import kotlin.math.atan2
 
 
@@ -119,11 +118,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
 
-                        if (binding.trackingSwitch.isChecked) it.moveCamera(
+                        if (binding.trackingSwitch.isChecked) {
+                            it.moveCamera(
                             CameraUpdate.scrollTo(
                                 coordinate
+                                )
                             )
-                        )
+                            naverMap.moveCamera(CameraUpdate.zoomTo(18.0))
+                        }
                     }
                 }
             }
@@ -162,6 +164,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         initMap()
         setupCompass()
 
+        binding.trackingSwitch.isChecked = true
+
+        binding.mapButton.setOnClickListener(View.OnClickListener {
+            if(binding.mapButton.text.equals("지도 모드")){
+                binding.trackingButton.visibility = View.INVISIBLE
+                binding.mapButton.setText("일반 모드")
+            }
+            else{
+                binding.trackingButton.visibility = View.VISIBLE
+                binding.mapButton.setText("지도 모드")
+            }
+
+
+        })
+
+
     }
 
     private fun setupCompass() {
@@ -182,7 +200,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.trackingButton.setOnClickListener {
             if (requesting) {
                 stopTracking()
-                it.setBackgroundColor(ContextCompat.getColor(this, R.color.purple_200))
+                binding.trackingButton.setText("안내 시작")
+                it.setBackgroundColor(ContextCompat.getColor(this, R.color.light_green))
+
+
             } else {
                 checkPermissions()
             }
@@ -212,6 +233,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
             locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
             locationOverlay.anchor = PointF(0.5f, 1f)
+
         }
         this.naverMap = naverMap
     }
@@ -540,7 +562,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     @SuppressLint("MissingPermission")
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
-        binding.trackingButton.setBackgroundColor(Color.RED)
+        binding.trackingButton.setBackgroundColor(R.color.light_red)
+        binding.trackingButton.setText("안내 중")
         requesting = true
         fusedLocationProviderClient.requestLocationUpdates(
             createLocationRequest(),
