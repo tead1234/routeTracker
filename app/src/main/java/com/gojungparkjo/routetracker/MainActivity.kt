@@ -402,14 +402,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         }
 
                         if(midLine1Intersect>midLine2Intersect){
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(midLine1[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(midLine1[1])
+                            val newMidLine1 = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
+                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[0])
+                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[1])
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
                         }else if(midLine1Intersect<midLine2Intersect){
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(midLine2[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(midLine2[1])
+                            val newMidLine2 = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[0])
+                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[1])
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
                             Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
