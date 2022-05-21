@@ -169,7 +169,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         compass.setListener(object : Compass.CompassListener {
             override fun onNewAzimuth(azimuth: Float) {
                 binding.compassTextView.text = azimuth.toInt().toString()
-                paintTrafficSignAndCrosswalkInSight(azimuth.toDouble())
+                findTrafficSignAndCrosswalkInSight(azimuth.toDouble())
             }
         })
     }
@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private var colorJob = Job().job
 
-    private fun paintTrafficSignAndCrosswalkInSight(degree: Double) {
+    private fun findTrafficSignAndCrosswalkInSight(degree: Double) {
         if (fetchAndMakeJob.isActive) return
         if (this::naverMap.isInitialized) {
             if (colorJob.isActive) return
@@ -256,7 +256,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     polygonMap.forEach { (_, polygon) ->
                         var nearest = Double.MAX_VALUE
                         var flag = false
-                        polygon.coords.forEach {
+                        polygon.first.coords.forEach {
                             val temp = it.distanceTo(map.locationOverlay.position)
                             if (temp < nearest && temp < 10) {
                                 nearest = temp
@@ -268,7 +268,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 flag = diff in -20..20
                             }
                         }
-                        polygon.color = if (flag) Color.RED else Color.WHITE
+                        polygon.first.color = if (flag) Color.RED else Color.WHITE
                     }
                 }
 
@@ -276,7 +276,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    private val polygonMap = HashMap<String, PolygonOverlay>()
+    private val polygonMap = HashMap<String, Triple<PolygonOverlay,Pair<LatLng,LatLng>,Pair<String,String>>>()
     private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
@@ -352,14 +352,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         val crossWalkPolygon = PolygonOverlay().apply {
                             coords = list; color = Color.WHITE
                             outlineWidth = 5; outlineColor = Color.GREEN
-                            tag = feature.properties.toString()
+                            tag = feature.properties.cSSCDE.toString()
                             setOnClickListener {
                                 binding.infoTextView.text = it.tag.toString()
                                 binding.infoTextView.visibility = View.VISIBLE
                                 true
                             }
                         }
-                        polygonMap[feature.properties.mGRNU] = crossWalkPolygon
 
                         // 최소 사각형
                         val rectanglePolygon = crossWalkPolygon.minimumRectangle()
@@ -404,21 +403,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
 
+                        var mainMidLine:List<LatLng>
+                        var label1 :String
+                        var label2 :String
+
                         if(midLine1Intersect>midLine2Intersect){
-                            val newMidLine1 = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[1])
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                            mainMidLine = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
+
                         }else if(midLine1Intersect<midLine2Intersect){
-                            val newMidLine2 = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
-                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[0])
-                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[1])
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
-                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                            mainMidLine = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                        }else{
+                            val midPoint = LineSegment.midPoint(middlePoints[0].toCoordinate(),middlePoints[2].toCoordinate()).toLatLng()
+                            mainMidLine = listOf(midPoint,midPoint)
                         }
+
+                        label1 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[0])?.poiInfo?.name?:""
+                        label2 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[1])?.poiInfo?.name?:""
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label1")
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label2")
+                        Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+
+                        polygonMap[feature.properties.mGRNU] = Triple(crossWalkPolygon,Pair(mainMidLine[0],mainMidLine[1]),Pair(label1,label2))
 
                         polylineMap[feature.properties.mGRNU + "L1"] =
                             PolylineOverlay(midLine1).apply {
@@ -492,7 +497,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
 
             polygonMap.forEach { (_, crosswalk) ->
-                crosswalk.map = if (bound.contains(crosswalk.bounds)) naverMap else null
+                crosswalk.first.map = if (bound.contains(crosswalk.first.bounds)) naverMap else null
             }
             pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
                 pedestrianRoad.map =
