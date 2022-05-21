@@ -23,6 +23,7 @@ import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.gojungparkjo.routetracker.model.FeedBackDialog
 import com.gojungparkjo.routetracker.model.TTS_Module
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
+import com.gojungparkjo.routetracker.model.intersection.InterSectionResponse
 import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.google.android.gms.location.*
@@ -276,7 +277,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
-
+    private val interSectionMap = HashMap<String, String>()
     private var fetchAndMakeJob = Job().job
 
     private fun fetchDataWithInBound(bound: LatLngBounds?) {
@@ -295,6 +296,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 val crossWalkResponse = repository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
+                val InterSectionResponse = repository.getIntersectionInBound(bound)
+                InterSectionResponse?.let{getInterSectionNameInBound(it)}
             }
             fetchAndMakeJob.join()
             addShapesWithInBound(bound)
@@ -442,6 +445,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 }
             }
         }
+    private fun getInterSectionNameInBound(response: InterSectionResponse){
+        // 각 피쳐를 가져온다음 css 네임을
+        response.features.forEach{ feature ->
+            if(interSectionMap.containsKey(feature.properties.MGRNU))
+                return@forEach
+            feature.properties.let{ property ->
+                interSectionMap[property.MGRNU] = property.CSS_NAM
+            }
+        }
+
+
+    }
 
     private fun addShapesWithInBound(bound: LatLngBounds?) {
         if (bound == null) return
