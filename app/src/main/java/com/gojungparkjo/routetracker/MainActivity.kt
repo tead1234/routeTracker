@@ -10,6 +10,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
@@ -19,6 +20,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
+import com.gojungparkjo.routetracker.data.TmapLabelRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.gojungparkjo.routetracker.model.FeedBackDialog
 import com.gojungparkjo.routetracker.model.TTS_Module
@@ -51,7 +53,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     // 네이버지도 fusedLocationSource
     private lateinit var locationSource: FusedLocationSource
-    private val repository = RoadRepository()
+    private val tmapLabelRepository = TmapLabelRepository()
+    private val roadRepository = RoadRepository()
     private var currentSteps = 0
     private val db = Firebase.firestore
     private lateinit var tts: TTS_Module
@@ -288,13 +291,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             binding.loadingView.visibility = View.VISIBLE
             fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
                 if (bound == null) return@fetch
-                val trafficLights = repository.getTrafficLightInBound(bound)
+                val trafficLights = roadRepository.getTrafficLightInBound(bound)
                 trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
-                val pedestrianRoadResponse = repository.getPedestrianRoadInBound(bound)
+                val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
                 pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-                val trafficIslandResponse = repository.getTrafficIslandInBound(bound)
+                val trafficIslandResponse = roadRepository.getTrafficIslandInBound(bound)
                 trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-                val crossWalkResponse = repository.getRoadInBound(bound)
+                val crossWalkResponse = roadRepository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
                 val InterSectionResponse = repository.getIntersectionInBound(bound)
                 InterSectionResponse?.let{getInterSectionNameInBound(it)}
@@ -401,6 +404,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                             }
                         }
 
+                        if(midLine1Intersect>midLine2Intersect){
+                            val newMidLine1 = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
+                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[0])
+                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine1[1])
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                        }else if(midLine1Intersect<midLine2Intersect){
+                            val newMidLine2 = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                            val res1 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[0])
+                            val res2 = tmapLabelRepository.getLabelFromLatLng(newMidLine2[1])
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res1")
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: $res2")
+                            Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+                        }
+
                         polylineMap[feature.properties.mGRNU + "L1"] =
                             PolylineOverlay(midLine1).apply {
                                 zIndex = 20003
@@ -408,6 +427,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                     Color.MAGENTA
                                 setOnClickListener { it.map = null; true }
                             }
+
                         polylineMap[feature.properties.mGRNU + "L2"] =
                             PolylineOverlay(midLine2).apply {
                                 zIndex = 20003
