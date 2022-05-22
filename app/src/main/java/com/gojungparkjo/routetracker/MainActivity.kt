@@ -298,15 +298,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                         nearestInterSection.second.second.latitude - map.locationOverlay.position.latitude).toDouble()
                                     if(temp3 >= temp4){
                                         direct = nearestInterSection.third.first.toString()
-                                        Log.d(TAG, "방면: $direct")
                                     }else{
                                         direct = nearestInterSection.third.second.toString()
-                                        Log.d(TAG, "방면: $direct")
                                     }
                                 }
                                 if (polygon.first.tag != null){
                                     // csscde
-                                    var crossWalk = interSectionMap[polygon.first.tag.toString()]
+                                    var crossWalk = interSectionMap[polygon.first.tag]
                                     Log.d(TAG, "사거리: $crossWalk")
                                     var anonunce = "${direct}방면 ${crossWalk}교차로 횡단보도입니다."
                                     tts.speakOut(anonunce)
@@ -531,10 +529,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private fun getInterSectionNameInBound(response: InterSectionResponse){
         // 각 피쳐를 가져온다음 css 네임을
         response.features.forEach{ feature ->
-            if(interSectionMap.containsKey(feature.properties.MGRNU))
+            if(interSectionMap.containsKey(feature.properties.CSS_NUM.toString()))
                 return@forEach
             feature.properties.let{ property ->
-                interSectionMap[property.MGRNU] = property.CSS_NAM
+                // 지금 문제가 tag에 들어있는 값은 csscde
+                interSectionMap[property.CSS_NUM.toString()] = property.CSS_NAM
+                Log.d(TAG,"잡히나: $interSectionMap[property.CSS_NUM.toString()]")
             }
         }
 

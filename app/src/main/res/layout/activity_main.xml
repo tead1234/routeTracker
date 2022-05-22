@@ -21,6 +21,58 @@
             android:id="@+id/map"
             tools:visibility="gone"
             android:name="com.naver.maps.map.MapFragment" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#0DFFFFFF"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/mapButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:text="지도 모드"
+                    android:textColor="@color/black"></androidx.appcompat.widget.AppCompatButton>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:textColor="@color/black"
+                    android:visibility="invisible"></androidx.appcompat.widget.AppCompatButton>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/settingButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:text="설정(예정)"
+                    android:textColor="@color/black"></androidx.appcompat.widget.AppCompatButton>
+
+            </LinearLayout>
+
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/tracking_button"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="#80008000"
+                android:text="안내 시작\n(화면 꽉차게 만들 예정)"
+                android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+
+
+        </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <ProgressBar
@@ -97,58 +149,5 @@
         android:id="@+id/tracking_switch"
         android:background="@color/gray_a70"
         />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#0DFFFFFF"
-        android:orientation="vertical">
-
-        <LinearLayout
-            android:layout_marginTop="30dp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/mapButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="지도 모드"
-                android:background="@color/white"
-                android:textColor="@color/black"
-                android:layout_weight="1">
-            </androidx.appcompat.widget.AppCompatButton>
-            <androidx.appcompat.widget.AppCompatButton
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@color/white"
-                android:textColor="@color/black"
-                android:layout_weight="1"
-                android:visibility="invisible">
-            </androidx.appcompat.widget.AppCompatButton>
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/settingButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="설정(예정)"
-                android:background="@color/white"
-                android:textColor="@color/black"
-                android:layout_weight="1">
-            </androidx.appcompat.widget.AppCompatButton>
-
-        </LinearLayout>
-
-
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/tracking_button"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:text="안내 시작\n(화면 꽉차게 만들 예정)"
-            android:background="#80008000"
-            android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
-
-
-    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
