@@ -36,7 +36,6 @@ import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.*
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
-import com.naver.maps.map.util.MarkerIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
@@ -44,6 +43,7 @@ import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
 import kotlin.collections.HashMap
 import kotlin.math.atan2
+import kotlin.math.min
 
 
 class MainActivity : AppCompatActivity(), SensorEventListener,
@@ -238,37 +238,66 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             colorJob = MainScope().launch {
                 naverMap.let { map ->
                     map.locationOverlay.bearing = degree.toFloat()
-                    trafficLightMap.forEach { (_, trafficLight) ->
-                        val temp = atan2(
-                            trafficLight.position.longitude - map.locationOverlay.position.longitude,
-                            trafficLight.position.latitude - map.locationOverlay.position.latitude
+//                    trafficLightMap.forEach { (_, trafficLight) ->
+//                        val temp = atan2(
+//                            trafficLight.position.longitude - map.locationOverlay.position.longitude,
+//                            trafficLight.position.latitude - map.locationOverlay.position.latitude
+//                        ).toDegree()
+//                        val diff = temp.toInt() - degree.toInt()
+//                        val dist = trafficLight.position.distanceTo(map.locationOverlay.position)
+//                        trafficLight.captionText = "diff: $diff"
+//                        trafficLight.iconTintColor =
+//                            if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
+//                        trafficLight.icon = MarkerIcons.BLACK
+//                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
+//                            tts.speakOut(trafficLight.tag.toString())
+//                        }
+//                    }
+                    var nearestEntryPointDistanceInSight = Double.MAX_VALUE
+                    var nearestEntryPointIntersectionCode: String = ""
+                    var nearestEntryPointCrossWalkCode: String = ""
+                    var first = false
+                    polygonMap.forEach { (_, polygon) -> //횡단보도 하나씩 확인
+                        val firstPointDistance = //횡단보도 중심선분 한쪽과의 거리
+                            polygon.second.first.distanceTo(map.locationOverlay.position)
+                        val secondPointDistance = //횡단보도 중심선분 다른 한쪽과의 거리
+                            polygon.second.second.distanceTo(map.locationOverlay.position)
+                        //둘 중 가까운 것
+                        val minPointDistance = min(firstPointDistance, secondPointDistance)
+                        //둘 중 가까운 것이 10m 이상이면 제외
+                        if (minPointDistance > 10) return@forEach
+                        //둘 중 가까운 점의 좌표
+                        val nearPoint =
+                            if (firstPointDistance < secondPointDistance) polygon.second.first else polygon.second.second
+                        //가까운 점과의 각도
+                        val angle = atan2(
+                            nearPoint.longitude - map.locationOverlay.position.longitude,
+                            nearPoint.latitude - map.locationOverlay.position.latitude
                         ).toDegree()
-                        val diff = temp.toInt() - degree.toInt()
-                        val dist = trafficLight.position.distanceTo(map.locationOverlay.position)
-                        trafficLight.captionText = "diff: $diff"
-                        trafficLight.iconTintColor =
-                            if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
-                        trafficLight.icon = MarkerIcons.BLACK
-                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
-                            tts.speakOut(trafficLight.tag.toString())
+                        val diff = angle.toInt() - degree.toInt()
+                        // 점이 바라보고 있는 -20~20도 사이에 없으면 제외
+                        if (diff !in -20..20) return@forEach
+                        // 이제 10m 안에 있고, -20~20도 사이에 있는 점까지 걸렀고,
+                        // 그런 점들 중 최단 거리에 있는 점을 찾기 위해, 비교 후 최단이라면 저장
+                        if (minPointDistance < nearestEntryPointDistanceInSight) {
+                            // 최단 거리보다 가까우면 최단거리 갱신
+                            nearestEntryPointDistanceInSight = minPointDistance
+                            // 횡단보도 정보 저장
+                            (polygon.first.tag as List<String>).also {
+                                nearestEntryPointIntersectionCode = it[0]
+                                nearestEntryPointCrossWalkCode = it[1]
+                            }
+                            // 첫번쨰 점인지 두번째 점인지 정보 저장
+                            first = firstPointDistance < secondPointDistance
                         }
                     }
-                    polygonMap.forEach { (_, polygon) ->
-                        var nearest = Double.MAX_VALUE
-                        var flag = false
-                        polygon.first.coords.forEach {
-                            val temp = it.distanceTo(map.locationOverlay.position)
-                            if (temp < nearest && temp < 10) {
-                                nearest = temp
-                                val temp2 = atan2(
-                                    it.longitude - map.locationOverlay.position.longitude,
-                                    it.latitude - map.locationOverlay.position.latitude
-                                ).toDegree()
-                                val diff = temp2.toInt() - degree.toInt()
-                                flag = diff in -20..20
-                            }
-                        }
-                        polygon.first.color = if (flag) Color.RED else Color.WHITE
+                    if (nearestEntryPointDistanceInSight != Double.MAX_VALUE) {
+                        Log.d(
+                            TAG,
+                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
+                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
+                        )
+                        tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다.")
                     }
                 }
 
@@ -276,7 +305,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    private val polygonMap = HashMap<String, Triple<PolygonOverlay,Pair<LatLng,LatLng>,Pair<String,String>>>()
+    private val polygonMap =
+        HashMap<String, Triple<PolygonOverlay, Pair<LatLng, LatLng>, Pair<String, String>>>()
     private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
@@ -291,6 +321,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             binding.loadingView.visibility = View.VISIBLE
             fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
                 if (bound == null) return@fetch
+                val interSectionResponse = roadRepository.getIntersectionInBound(bound)
+                interSectionResponse?.let { getInterSectionNameInBound(it) }
                 val trafficLights = roadRepository.getTrafficLightInBound(bound)
                 trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
                 val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
@@ -299,8 +331,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 val crossWalkResponse = roadRepository.getRoadInBound(bound)
                 crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
-                val InterSectionResponse = roadRepository.getIntersectionInBound(bound)
-                InterSectionResponse?.let{getInterSectionNameInBound(it)}
             }
             fetchAndMakeJob.join()
             addShapesWithInBound(bound)
@@ -348,100 +378,124 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     it.forEach { point ->
                         list.add(ProjCoordinate(point[0], point[1]).toLatLng())
                     }
-                    if (list.size > 2) {
-                        val crossWalkPolygon = PolygonOverlay().apply {
-                            coords = list; color = Color.WHITE
-                            outlineWidth = 5; outlineColor = Color.GREEN
-                            tag = feature.properties.cSSCDE.toString()
-                            setOnClickListener {
-                                binding.infoTextView.text = it.tag.toString()
-                                binding.infoTextView.visibility = View.VISIBLE
-                                true
-                            }
+                    if (list.size <= 2) return@forEach
+
+                    val crossWalkPolygon = PolygonOverlay().apply {
+                        coords = list; color = Color.WHITE
+                        outlineWidth = 5; outlineColor = Color.GREEN
+                        tag = listOf(
+                            feature.properties.cSSCDE.toString().trim(),
+                            feature.properties.mGRNU
+                        )
+                        setOnClickListener {
+                            binding.infoTextView.text = it.tag.toString()
+                            binding.infoTextView.visibility = View.VISIBLE
+                            true
                         }
+                    }
 
-                        // 최소 사각형
-                        val rectanglePolygon = crossWalkPolygon.minimumRectangle()
-                        // 사각형 꼭짓점
-                        val rectangleCoord = rectanglePolygon.coords.map { it.toCoordinate() }
-                        // 각 변의 중점 찾기
-                        val middlePoints = mutableListOf<LatLng>()
-                        for (i in 0 until rectangleCoord.size - 1) {
-                            val middlePoint =
-                                LineSegment.midPoint(rectangleCoord[i], rectangleCoord[i + 1])
-                            middlePoints.add(middlePoint.toLatLng())
-
-                        }
-                        // 중심선 잇고 늘이기
-                        val delta = 0.00003
-                        val midLine1 =
-                            lengthenLine(middlePoints[0], middlePoints[2], delta)
-                        val midLine2 =
-                            lengthenLine(middlePoints[1], middlePoints[3], delta)
-
-                        val geometryFactory = GeometryFactory()
-                        val midLine1Geometry = LineSegment(
-                            midLine1[0].toCoordinate(),
-                            midLine1[1].toCoordinate()
-                        ).toGeometry(geometryFactory)
-                        val midLine2Geometry = LineSegment(
-                            midLine2[0].toCoordinate(),
-                            midLine2[1].toCoordinate()
-                        ).toGeometry(geometryFactory)
-
-                        // 중심선과 도보 교차 계산
-                        var midLine1Intersect = 0
-                        var midLine2Intersect = 0
-
-                        withContext(Dispatchers.Main) {
-                            pedestrianRoadMap.forEach { _, polygon ->
-                                val polygonBoundary =
-                                    geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
-                                        .toTypedArray()).boundary
-                                if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
-                                if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
-                            }
-                        }
-
-                        var mainMidLine:List<LatLng>
-                        var label1 :String
-                        var label2 :String
-
-                        if(midLine1Intersect>midLine2Intersect){
-                            mainMidLine = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
-
-                        }else if(midLine1Intersect<midLine2Intersect){
-                            mainMidLine = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
-                        }else{
-                            val midPoint = LineSegment.midPoint(middlePoints[0].toCoordinate(),middlePoints[2].toCoordinate()).toLatLng()
-                            mainMidLine = listOf(midPoint,midPoint)
-                        }
-
-                        label1 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[0])?.poiInfo?.name?:""
-                        label2 = tmapLabelRepository.getLabelFromLatLng(mainMidLine[1])?.poiInfo?.name?:""
-                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label1")
-                        Log.d(TAG, "addPolygonFromCrossWalkResponse: $label2")
-                        Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
-
-                        polygonMap[feature.properties.mGRNU] = Triple(crossWalkPolygon,Pair(mainMidLine[0],mainMidLine[1]),Pair(label1,label2))
-
-                        polylineMap[feature.properties.mGRNU + "L1"] =
-                            PolylineOverlay(midLine1).apply {
-                                zIndex = 20003
-                                if (midLine1Intersect > midLine2Intersect) color =
-                                    Color.MAGENTA
-                                setOnClickListener { it.map = null; true }
-                            }
-
-                        polylineMap[feature.properties.mGRNU + "L2"] =
-                            PolylineOverlay(midLine2).apply {
-                                zIndex = 20003
-                                if (midLine1Intersect < midLine2Intersect) color =
-                                    Color.MAGENTA
-                                setOnClickListener { it.map = null; true }
-                            }
+                    // 최소 사각형
+                    val rectanglePolygon = crossWalkPolygon.minimumRectangle()
+                    // 사각형 꼭짓점
+                    val rectangleCoord = rectanglePolygon.coords.map { it.toCoordinate() }
+                    // 각 변의 중점 찾기
+                    val middlePoints = mutableListOf<LatLng>()
+                    for (i in 0 until rectangleCoord.size - 1) {
+                        val middlePoint =
+                            LineSegment.midPoint(rectangleCoord[i], rectangleCoord[i + 1])
+                        middlePoints.add(middlePoint.toLatLng())
 
                     }
+                    // 중심선 잇고 늘이기
+                    val delta = 0.00003
+                    val midLine1 =
+                        lengthenLine(middlePoints[0], middlePoints[2], delta)
+                    val midLine2 =
+                        lengthenLine(middlePoints[1], middlePoints[3], delta)
+
+                    val geometryFactory = GeometryFactory()
+                    val midLine1Geometry = LineSegment(
+                        midLine1[0].toCoordinate(),
+                        midLine1[1].toCoordinate()
+                    ).toGeometry(geometryFactory)
+                    val midLine2Geometry = LineSegment(
+                        midLine2[0].toCoordinate(),
+                        midLine2[1].toCoordinate()
+                    ).toGeometry(geometryFactory)
+
+                    // 중심선과 도보 교차 계산
+                    var midLine1Intersect = 0
+                    var midLine2Intersect = 0
+
+                    withContext(Dispatchers.Main) {
+                        pedestrianRoadMap.forEach { _, polygon ->
+                            val polygonBoundary =
+                                geometryFactory.createPolygon(polygon.coords.map { it.toCoordinate() }
+                                    .toTypedArray()).boundary
+                            if (polygonBoundary.intersects(midLine1Geometry)) midLine1Intersect++
+                            if (polygonBoundary.intersects(midLine2Geometry)) midLine2Intersect++
+                        }
+                    }
+
+                    var mainMidLine: List<LatLng>
+                    var label1: String
+                    var label2: String
+
+                    if (midLine1Intersect > midLine2Intersect) {
+                        mainMidLine = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
+
+                    } else if (midLine1Intersect < midLine2Intersect) {
+                        mainMidLine = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                    } else {
+                        mainMidLine =
+                            listOf(rectangleCoord[0].toLatLng(), rectangleCoord[2].toLatLng())
+                    }
+
+                    label1 =
+                        tmapLabelRepository.getLabelFromLatLng(mainMidLine[0])?.poiInfo?.name
+                            ?: ""
+                    label2 =
+                        tmapLabelRepository.getLabelFromLatLng(mainMidLine[1])?.poiInfo?.name
+                            ?: ""
+                    Log.d(TAG, "addPolygonFromCrossWalkResponse: $label1")
+                    Log.d(TAG, "addPolygonFromCrossWalkResponse: $label2")
+                    Log.d(TAG, "addPolygonFromCrossWalkResponse: #######")
+
+                    val mainMidLineGeometry = LineSegment(
+                        mainMidLine[0].toCoordinate(),
+                        mainMidLine[1].toCoordinate()
+                    ).toGeometry(geometryFactory)
+
+                    val intersectionPoint =
+                        geometryFactory.createPolygon(crossWalkPolygon.coords.map { it.toCoordinate() }.toTypedArray())
+                            .intersection(mainMidLineGeometry).coordinates
+                    Log.d(
+                        TAG,
+                        "addPolygonFromCrossWalkResponse: ${intersectionPoint.joinToString(" ")}"
+                    )
+                    polygonMap[feature.properties.mGRNU] = Triple(
+                        crossWalkPolygon,
+                        Pair(intersectionPoint[0].toLatLng(), intersectionPoint[1].toLatLng()),
+                        Pair(label1, label2)
+                    )
+
+                    polylineMap[feature.properties.mGRNU + "L1"] =
+                        PolylineOverlay(midLine1).apply {
+                            zIndex = 20003
+                            if (midLine1Intersect > midLine2Intersect) color =
+                                Color.MAGENTA
+                            setOnClickListener { it.map = null; true }
+                        }
+
+                    polylineMap[feature.properties.mGRNU + "L2"] =
+                        PolylineOverlay(midLine2).apply {
+                            zIndex = 20003
+                            if (midLine1Intersect < midLine2Intersect) color =
+                                Color.MAGENTA
+                            setOnClickListener { it.map = null; true }
+                        }
+
+
                 }
             }
         }
@@ -470,17 +524,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 }
             }
         }
-    private fun getInterSectionNameInBound(response: InterSectionResponse){
+
+    private suspend fun getInterSectionNameInBound(response: InterSectionResponse) {
         // 각 피쳐를 가져온다음 css 네임을
-        response.features.forEach{ feature ->
-            if(interSectionMap.containsKey(feature.properties.MGRNU))
-                return@forEach
-            feature.properties.let{ property ->
-                interSectionMap[property.MGRNU] = property.CSS_NAM
+        withContext(Dispatchers.Default) {
+            response.features.forEach { feature ->
+                if (interSectionMap.containsKey(feature.properties.CSS_NUM.toString().trim()))
+                    return@forEach
+                feature.properties.let { property ->
+                    interSectionMap[property.CSS_NUM.toString().trim()] = property.CSS_NAM
+                }
             }
         }
-
-
     }
 
     private fun addShapesWithInBound(bound: LatLngBounds?) {
@@ -497,7 +552,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
 
             polygonMap.forEach { (_, crosswalk) ->
-                crosswalk.first.map = if (bound.contains(crosswalk.first.bounds)) naverMap else null
+                crosswalk.first.map =
+                    if (bound.contains(crosswalk.first.bounds) || bound.intersects(crosswalk.first.bounds)) naverMap else null
             }
             pedestrianRoadMap.forEach { (_, pedestrianRoad) ->
                 pedestrianRoad.map =
@@ -507,7 +563,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 trafficLight.map = if (bound.contains(trafficLight.position)) naverMap else null
             }
             polylineMap.forEach { (_, polyline) ->
-                polyline.map = if (bound.contains(polyline.bounds)) naverMap else null
+                polyline.map =
+                    if (bound.contains(polyline.bounds) || bound.intersects(polyline.bounds)) naverMap else null
             }
 
             binding.loadingView.visibility = View.GONE
