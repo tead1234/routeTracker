@@ -64,8 +64,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     ) { permissions ->
         when {
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                // Precise location access granted.
-                startTracking(fusedLocationClient)
+                // Precise location access granted
+                    startTracking(fusedLocationClient)
             }
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
                 // Only approximate location access granted.
@@ -582,7 +582,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+
                 )
             )
         }
