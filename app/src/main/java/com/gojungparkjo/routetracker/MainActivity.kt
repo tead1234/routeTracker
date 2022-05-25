@@ -41,7 +41,6 @@ import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
-import kotlin.collections.HashMap
 import kotlin.math.atan2
 import kotlin.math.min
 
@@ -164,12 +163,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     }
 
+    var lastAnnounceTime = 0L
+
     private fun setupCompass() {
         compass = Compass(this)
         compass.setListener(object : Compass.CompassListener {
             override fun onNewAzimuth(azimuth: Float) {
                 binding.compassTextView.text = azimuth.toInt().toString()
-                findTrafficSignAndCrosswalkInSight(azimuth.toDouble())
+                if (::naverMap.isInitialized) naverMap.locationOverlay.bearing = azimuth
+                if (System.currentTimeMillis() - lastAnnounceTime > 5000) {
+                    findTrafficSignAndCrosswalkInSight(azimuth.toDouble())
+                }
             }
         })
     }
@@ -237,7 +241,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             if (colorJob.isActive) return
             colorJob = MainScope().launch {
                 naverMap.let { map ->
-                    map.locationOverlay.bearing = degree.toFloat()
 //                    trafficLightMap.forEach { (_, trafficLight) ->
 //                        val temp = atan2(
 //                            trafficLight.position.longitude - map.locationOverlay.position.longitude,
@@ -254,8 +257,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //                        }
 //                    }
                     var nearestEntryPointDistanceInSight = Double.MAX_VALUE
-                    var nearestEntryPointIntersectionCode: String = ""
-                    var nearestEntryPointCrossWalkCode: String = ""
+                    var nearestEntryPointIntersectionCode = ""
+                    var nearestEntryPointCrossWalkCode = ""
                     var first = false
                     polygonMap.forEach { (_, polygon) -> //횡단보도 하나씩 확인
                         val firstPointDistance = //횡단보도 중심선분 한쪽과의 거리
@@ -298,6 +301,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                     "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
                         )
                         tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                        lastAnnounceTime = System.currentTimeMillis()
                     }
                 }
 
@@ -467,7 +471,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                     ).toGeometry(geometryFactory)
 
                     val intersectionPoint =
-                        geometryFactory.createPolygon(crossWalkPolygon.coords.map { it.toCoordinate() }.toTypedArray())
+                        geometryFactory.createPolygon(crossWalkPolygon.coords.map { it.toCoordinate() }
+                            .toTypedArray())
                             .intersection(mainMidLineGeometry).coordinates
                     Log.d(
                         TAG,
