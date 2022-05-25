@@ -295,12 +295,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         }
                     }
                     if (nearestEntryPointDistanceInSight != Double.MAX_VALUE) {
-                        Log.d(
-                            TAG,
-                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
-                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
-                        )
-                        tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+//                        Log.d(
+//                            TAG,
+//                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
+//                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
+//                        )
+                        if(interSectionMap[nearestEntryPointIntersectionCode] != null){
+                            tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                        }else{
+                            tts.speakOut("${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                        }
                         lastAnnounceTime = System.currentTimeMillis()
                     }
                 }
