@@ -280,6 +280,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         val diff = angle.toInt() - degree.toInt()
                         // 점이 바라보고 있는 -20~20도 사이에 없으면 제외
                         if (diff !in -20..20) return@forEach
+                        // 횡단보도 진행방향과 사용자의 방향이 어느정도 일치하는지 확인
+                        val crossWalkAngle =
+                            if (firstPointDistance < secondPointDistance) atan2(
+                                polygon.second.second.longitude - polygon.second.first.longitude,
+                                polygon.second.second.latitude - polygon.second.first.latitude
+                            ).toDegree() else atan2(
+                                polygon.second.first.longitude - polygon.second.second.longitude,
+                                polygon.second.first.latitude - polygon.second.second.latitude
+                            ).toDegree()
+                        // 횡단보도의 진행방향과 사용자의 방향 차이가 -20~20도 이내가 아니면 스킵
+                        if (crossWalkAngle.toInt()-degree.toInt() !in -20..20) return@forEach
                         // 이제 10m 안에 있고, -20~20도 사이에 있는 점까지 걸렀고,
                         // 그런 점들 중 최단 거리에 있는 점을 찾기 위해, 비교 후 최단이라면 저장
                         if (minPointDistance < nearestEntryPointDistanceInSight) {
