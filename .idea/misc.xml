@@ -3,6 +3,11 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Users/hyeonpar/routeTracker/app/src/main/res/layout/activity_main.xml" value="0.22" />
+        <entry key="..\:/Users/hyeonpar/routeTracker/app/src/main/res/layout/balloon.xml" value="0.18854166666666666" />
+        <entry key="..\:/Users/hyeonpar/routeTracker/app/src/main/res/layout/feedbackdialog.xml" value="0.18854166666666666" />
+        <entry key="..\:/Users/hyeonpar/routeTracker/app/src/main/res/layout/fragment_bug_report.xml" value="0.5" />
+        <entry key="..\:/Users/hyeonpar/routeTracker/app/src/main/res/layout/msg_send_preview.xml" value="0.33" />
         <entry key="..\:/Users/tead1/AndroidStudioProjects/routeTracker/app/src/main/res/layout/activity_main.xml" value="0.14270833333333333" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.1175925925925926" />
         <entry key="app/src/main/res/layout/fragment_bug_report.xml" value="0.1175925925925926" />

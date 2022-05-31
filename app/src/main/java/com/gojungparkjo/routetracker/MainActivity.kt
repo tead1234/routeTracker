@@ -2,21 +2,24 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.ProgressDialog.show
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
-import android.graphics.Rect
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.telephony.SmsManager
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
-import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -81,7 +84,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    // locationSource 퍼미션 ㅇ더어오기 추후 통합해야할듯??
+    // locationSource 퍼미션 얻어오기 추후 통합해야할듯??
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -106,7 +109,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
             0
         )
-        Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "걸음수 권한 획득.", Toast.LENGTH_SHORT).show()
     }
 
 
@@ -144,6 +147,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private lateinit var sensorManager: SensorManager
 
+    private var phoneNumber = "" // 최종본에는 120이 들어가야 함
+    private val permissionRequest = 101
+    var checkAddFix : Boolean = false // true: add, false: fix
+    var mapMode : Boolean = false // true: mapMode, false: buttonMode
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var recognitionListener: RecognitionListener
+
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -164,14 +174,106 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         bindView()
         initMap()
         setupCompass()
+        smsSttSetup()
+    }
 
-        binding.testButton.setOnClickListener {
-            val bundle = Bundle().apply {
-                putParcelable("position",getCurrentPosition())
-            }
-            BugReportFragment().apply { arguments = bundle }.show(supportFragmentManager, "BugReport")
+    // 음향 신호기 고장 신고/설치 요청 관련 초기 셋업 함수
+    private fun smsSttSetup() {
+        // STT 관련 권한 요청
+        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this,
+                Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // 거부해도 계속 노출됨. ("다시 묻지 않음" 체크 시 노출 안됨)
+            // 허용은 한 번만 승인되면 그 다음부터 자동으로 허용됨
+            ActivityCompat.requestPermissions(this,
+                arrayOf(Manifest.permission.RECORD_AUDIO), 0)
         }
 
+        var intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+
+        // setListener
+        recognitionListener = object: RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                Toast.makeText(applicationContext, "음성인식을 시작합니다.", Toast.LENGTH_SHORT).show()
+            }
+            override fun onBeginningOfSpeech() {
+            }
+            override fun onRmsChanged(rmsdB: Float) {
+            }
+            override fun onBufferReceived(buffer: ByteArray?) {
+            }
+            override fun onEndOfSpeech() {
+            }
+            override fun onError(error: Int) {
+                var message: String
+
+                when (error) {
+                    SpeechRecognizer.ERROR_AUDIO ->
+                        message = "오디오 에러"
+                    SpeechRecognizer.ERROR_CLIENT ->
+                        message = "클라이언트 에러"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                        message = "퍼미션 에러"
+                    SpeechRecognizer.ERROR_NETWORK ->
+                        message = "네트워크 에러"
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                        message = "네트워크 타임아웃"
+                    SpeechRecognizer.ERROR_NO_MATCH ->
+                        message = "소리가 들리지 않았거나 적절한 변경 단어를 찾지 못함"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
+                        message = "RECOGNIZER_BUSY 에러"
+                    SpeechRecognizer.ERROR_SERVER ->
+                        message = "서버 에러"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                        message = "말하는 시간 초과"
+                    else ->
+                        message = "알 수 없는 오류"
+                }
+                Toast.makeText(applicationContext, "에러 발생: $message", Toast.LENGTH_SHORT).show()
+            }
+            override fun onResults(results: Bundle?) {
+                var matches: ArrayList<String> = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
+                val smsManager : SmsManager = SmsManager.getDefault()
+                var symptom = ""
+                for (i in 0 until matches.size) {
+                    symptom = matches[i]
+                }
+                var reportType = if (checkAddFix) "설치 요청" else "고장 신고"
+                var myMsg = "음향신호기 ${reportType}합니다.\n" +
+                        "증상은 ${symptom}."
+                var reportLocation = "https://m.map.naver.com/appLink.naver?app=Y&pinType=site&" +
+                        "lng=${naverMap.locationOverlay.position.longitude}&appMenu=location&menu=location&version=2&" +
+                        "lat=${naverMap.locationOverlay.position.latitude}"
+//                checkMsgSend(symptom)
+
+                // 일정 글자수 초과시 발송되지 않는 것으로 보임
+                smsManager.sendTextMessage(phoneNumber, null, myMsg, null, null)
+                smsManager.sendTextMessage(phoneNumber, null, reportLocation, null, null)
+                sendMessage()
+            }
+            override fun onPartialResults(partialResults: Bundle?) {
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {
+            }
+        }
+    }
+
+    // msp 다이얼로그에서 보내기 누르면 발송하도록 구현하고 싶은 상황, 현재 미구현
+    fun checkMsgSend(symptom: String) {
+        tts.speakOut("최종 신고를 할까요?")
+        val msp = MsgSendPreview(this, symptom)
+        msp.show(this)
+    }
+
+    fun sendMessage() {
+        Toast.makeText(this, "메시지를 보냈습니다.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun startSpeech() {
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer.setRecognitionListener(recognitionListener)
+        speechRecognizer.startListening(intent)
     }
 
     var lastAnnounceTime = 0L
@@ -189,6 +291,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         })
     }
 
+    // 버튼 클릭 등 이벤트 관리
     private fun bindView() {
         binding.compassTextView.setOnClickListener {
             naverMap.locationOverlay.position = naverMap.cameraPosition.target
@@ -197,13 +300,56 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.trackingButton.setOnClickListener {
             if (requesting) {
                 stopTracking()
-                it.setBackgroundColor(ContextCompat.getColor(this, R.color.purple_200))
+                binding.trackingButton.setBackgroundColor(Color.parseColor("#80BB86FC"))
+                binding.trackingButton.text = "안내 시작"
+                Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
             } else {
                 checkPermissions()
             }
         }
         binding.infoTextView.setOnClickListener {
             it.visibility = View.GONE
+        }
+        // 음향신호기 고장 신고/설치 요청
+        binding.fixButton.setOnClickListener {
+            checkAddFix = false
+            tts.speakOut("고장 신고 버튼을 누르셨습니다. 증상을 말씀해주세요.")
+            Handler().postDelayed(java.lang.Runnable {
+                startSpeech()
+            }, 5000)
+        }
+        binding.addButton.setOnClickListener {
+            checkAddFix = true
+            tts.speakOut("설치 요청 버튼을 누르셨습니다. 증상을 말씀해주세요.")
+            Handler().postDelayed(java.lang.Runnable {
+                startSpeech()
+            }, 5000)
+        }
+        // 테스트(오류 제보) 버튼
+        binding.testButton.setOnClickListener {
+            val bundle = Bundle().apply {
+                putParcelable("position",getCurrentPosition())
+            }
+            BugReportFragment().apply { arguments = bundle }.show(supportFragmentManager, "BugReport")
+        }
+        // 지도 모드/버튼 모드
+        binding.mapButton.setOnClickListener {
+            if (!mapMode) {
+                binding.testButton.visibility = View.INVISIBLE
+                binding.addButton.visibility = View.INVISIBLE
+                binding.fixButton.visibility = View.INVISIBLE
+                binding.trackingButton.visibility = View.INVISIBLE
+                binding.mapButton.text = "버튼 모드"
+                mapMode = true
+            }
+            else {
+                binding.testButton.visibility = View.VISIBLE
+                binding.addButton.visibility = View.VISIBLE
+                binding.fixButton.visibility = View.VISIBLE
+                binding.trackingButton.visibility = View.VISIBLE
+                binding.mapButton.text = "지도 모드"
+                mapMode = false
+            }
         }
     }
 
@@ -629,7 +775,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     @SuppressLint("MissingPermission")
     fun startTracking(fusedLocationProviderClient: FusedLocationProviderClient) {
-        binding.trackingButton.setBackgroundColor(Color.RED)
+        binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
+        binding.trackingButton.text = "안내 종료"
+        Toast.makeText(this, "안내를 시작합니다.", Toast.LENGTH_SHORT).show()
         requesting = true
         fusedLocationProviderClient.requestLocationUpdates(
             createLocationRequest(),
