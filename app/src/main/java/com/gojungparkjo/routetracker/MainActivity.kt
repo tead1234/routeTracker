@@ -2,9 +2,11 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.ProgressDialog.show
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
+import android.graphics.Rect
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -12,7 +14,9 @@ import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -161,6 +165,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         initMap()
         setupCompass()
 
+        binding.testButton.setOnClickListener {
+            val bundle = Bundle().apply {
+                putParcelable("position",getCurrentPosition())
+            }
+            BugReportFragment().apply { arguments = bundle }.show(supportFragmentManager, "BugReport")
+        }
+
     }
 
     var lastAnnounceTime = 0L
@@ -290,7 +301,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                                 polygon.second.first.latitude - polygon.second.second.latitude
                             ).toDegree()
                         // 횡단보도의 진행방향과 사용자의 방향 차이가 -20~20도 이내가 아니면 스킵
-                        if (crossWalkAngle.toInt()-degree.toInt() !in -20..20) return@forEach
+                        if (crossWalkAngle.toInt() - degree.toInt() !in -20..20) return@forEach
                         // 이제 10m 안에 있고, -20~20도 사이에 있는 점까지 걸렀고,
                         // 그런 점들 중 최단 거리에 있는 점을 찾기 위해, 비교 후 최단이라면 저장
                         if (minPointDistance < nearestEntryPointDistanceInSight) {
@@ -585,6 +596,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
             binding.loadingView.visibility = View.GONE
         }
+    }
+
+    private fun getCurrentPosition():LatLng?{
+        if(!::naverMap.isInitialized || !naverMap.locationOverlay.isVisible) return null
+        return naverMap.locationOverlay.position
     }
 
     private fun checkPermissions() {
