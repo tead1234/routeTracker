@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         if (binding.trackingSwitch.isChecked) {
 
                             it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
-                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
                     }
                 }
@@ -272,7 +272,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.trackingButton.setOnClickListener {
             if (guideMode) {
                 guideMode = false
-                binding.trackingButton.setBackgroundColor(Color.parseColor("#80BB86FC"))
+                binding.trackingButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.trackingButton.text = "안내 시작"
                 Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
             } else {
