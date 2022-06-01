@@ -73,50 +73,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        when {
-            permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                // Precise location access granted
-                    startTracking(fusedLocationClient)
-            }
-            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                // Only approximate location access granted.
-                Toast.makeText(this, "정밀 권한을 주세요", Toast.LENGTH_SHORT).show()
-            }
-            else -> {
-                // No location access granted.
-                Toast.makeText(this, "위치 권한이 거부되었습니다.", Toast.LENGTH_SHORT).show()
-            }
+        if(permissions.all { result -> result.value == true }){
+            startTracking(fusedLocationClient)
+        }else{
+            Toast.makeText(this, "위치 권한을 주세요", Toast.LENGTH_SHORT).show()
+            Handler().postDelayed(Runnable {
+                finish()
+            },3000)
         }
     }
-
-    // locationSource 퍼미션 얻어오기 추후 통합해야할듯??
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        if (locationSource.onRequestPermissionsResult(
-                requestCode, permissions,
-                grantResults
-            )
-        ) {
-            if (!locationSource.isActivated) { // //권한 거부됨
-                naverMap.locationTrackingMode = LocationTrackingMode.None
-            }
-            return
-        }
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    }
-
-    val stepPermissionRequest = fun() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
-            0
-        )
-        Toast.makeText(this, "걸음수 권환획득.", Toast.LENGTH_SHORT).show()
-    }
-
 
     private val locationCallback by lazy {
         object : LocationCallback() {
@@ -130,11 +95,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
 
-                        if (binding.trackingSwitch.isChecked) it.moveCamera(
-                            CameraUpdate.scrollTo(
-                                coordinate
-                            )
-                        )
+                        if (binding.trackingSwitch.isChecked) {
+
+                            it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                        }
                     }
                 }
             }
@@ -152,10 +117,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private lateinit var sensorManager: SensorManager
 
-    private var phoneNumber = "" // 최종본에는 120이 들어가야 함
+    private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
     private val permissionRequest = 101
-    var checkAddFix : Boolean = false // true: add, false: fix
-    var mapMode : Boolean = false // true: mapMode, false: buttonMode
+    var checkAddFix: Boolean = false // true: add, false: fix
+    var mapMode: Boolean = false // true: mapMode, false: buttonMode
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var recognitionListener: RecognitionListener
 
@@ -181,17 +146,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         initMap()
         setupCompass()
         smsSttSetup()
+        checkPermissions()
     }
 
 
     private fun smsSttSetup() {
         // STT 관련 권한 요청
-        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             // 거부해도 계속 노출됨. ("다시 묻지 않음" 체크 시 노출 안됨)
             // 허용은 한 번만 승인되면 그 다음부터 자동으로 허용됨
-            ActivityCompat.requestPermissions(this,
-                arrayOf(Manifest.permission.RECORD_AUDIO), 0)
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO), 0
+            )
         }
 
         var intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -199,18 +170,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
 
         // setListener
-        recognitionListener = object: RecognitionListener {
+        recognitionListener = object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 Toast.makeText(applicationContext, "음성인식을 시작합니다.", Toast.LENGTH_SHORT).show()
             }
+
             override fun onBeginningOfSpeech() {
             }
+
             override fun onRmsChanged(rmsdB: Float) {
             }
+
             override fun onBufferReceived(buffer: ByteArray?) {
             }
+
             override fun onEndOfSpeech() {
             }
+
             override fun onError(error: Int) {
                 var message: String
 
@@ -238,9 +214,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 }
                 Toast.makeText(applicationContext, "에러 발생: $message", Toast.LENGTH_SHORT).show()
             }
+
             override fun onResults(results: Bundle?) {
-                var matches: ArrayList<String> = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
-                val smsManager : SmsManager = SmsManager.getDefault()
+                var matches: ArrayList<String> =
+                    results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
+                val smsManager: SmsManager = SmsManager.getDefault()
                 var symptom = ""
                 for (i in 0 until matches.size) {
                     symptom = matches[i]
@@ -258,8 +236,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 smsManager.sendTextMessage(phoneNumber, null, reportLocation, null, null)
                 sendMessage()
             }
+
             override fun onPartialResults(partialResults: Bundle?) {
             }
+
             override fun onEvent(eventType: Int, params: Bundle?) {
             }
         }
@@ -304,13 +284,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
 
         binding.trackingButton.setOnClickListener {
-            if (requesting) {
-                stopTracking()
+            if (guideMode) {
+                guideMode = false
                 binding.trackingButton.setBackgroundColor(Color.parseColor("#80BB86FC"))
                 binding.trackingButton.text = "안내 시작"
                 Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
             } else {
                 checkPermissions()
+                binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
+                binding.trackingButton.text = "안내 종료"
+                Toast.makeText(this, "안내를 시작합니다.", Toast.LENGTH_SHORT).show()
+                guideMode = true
             }
         }
         binding.infoTextView.setOnClickListener {
@@ -334,14 +318,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         // 테스트(오류 제보) 버튼
         binding.testButton.setOnClickListener {
             val bundle = Bundle().apply {
-                putParcelable("position",getCurrentPosition())
+                putParcelable("position", getCurrentPosition())
             }
-            BugReportFragment().apply { arguments = bundle }.show(supportFragmentManager, "BugReport")
+            BugReportFragment().apply { arguments = bundle }
+                .show(supportFragmentManager, "BugReport")
         }
         // 지도 모드/버튼 모드
         binding.mapButton.setOnClickListener {
             if (!mapMode) {
-                binding.testButton.visibility = View.INVISIBLE
+                //binding.testButton.visibility = View.INVISIBLE
                 binding.addButton.visibility = View.INVISIBLE
                 binding.fixButton.visibility = View.INVISIBLE
                 binding.trackingButton.visibility = View.INVISIBLE
@@ -349,7 +334,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 mapMode = true
             }
             else {
-                binding.testButton.visibility = View.VISIBLE
+                //binding.testButton.visibility = View.VISIBLE
                 binding.addButton.visibility = View.VISIBLE
                 binding.fixButton.visibility = View.VISIBLE
                 binding.trackingButton.visibility = View.VISIBLE
@@ -379,6 +364,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
             locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
             locationOverlay.anchor = PointF(0.5f, 1f)
+
         }
         this.naverMap = naverMap
     }
@@ -398,12 +384,30 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private var colorJob = Job().job
 
+    private var guideMode = false
+
     private fun findTrafficSignAndCrosswalkInSight(degree: Double) {
+        if(!guideMode) return
         if (fetchAndMakeJob.isActive) return
         if (this::naverMap.isInitialized) {
             if (colorJob.isActive) return
             colorJob = MainScope().launch {
                 naverMap.let { map ->
+//                    trafficLightMap.forEach { (_, trafficLight) ->
+//                        val temp = atan2(
+//                            trafficLight.position.longitude - map.locationOverlay.position.longitude,
+//                            trafficLight.position.latitude - map.locationOverlay.position.latitude
+//                        ).toDegree()
+//                        val diff = temp.toInt() - degree.toInt()
+//                        val dist = trafficLight.position.distanceTo(map.locationOverlay.position)
+//                        trafficLight.captionText = "diff: $diff"
+//                        trafficLight.iconTintColor =
+//                            if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
+//                        trafficLight.icon = MarkerIcons.BLACK
+//                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
+//                            tts.speakOut(trafficLight.tag.toString())
+//                        }
+//                    }
                     var nearestEntryPointDistanceInSight = Double.MAX_VALUE
                     var nearestEntryPointIntersectionCode = ""
                     var nearestEntryPointCrossWalkCode = ""
@@ -739,8 +743,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         }
     }
 
-    private fun getCurrentPosition():LatLng?{
-        if(!::naverMap.isInitialized || !naverMap.locationOverlay.isVisible) return null
+    private fun getCurrentPosition(): LatLng? {
+        if (!::naverMap.isInitialized || !naverMap.locationOverlay.isVisible) return null
         return naverMap.locationOverlay.position
     }
 
@@ -748,6 +752,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACTIVITY_RECOGNITION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             startTracking(fusedLocationClient)
@@ -755,16 +762,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                    )
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                )
             )
-        }
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) == PackageManager.PERMISSION_DENIED
-        ) {
-            stepPermissionRequest()
         }
     }
 
