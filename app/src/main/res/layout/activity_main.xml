@@ -28,41 +28,69 @@
             android:background="#0DFFFFFF"
             android:orientation="vertical">
 
-            <ImageView
+
+            <LinearLayout
+                android:background="@color/white"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:src="@drawable/logo"
-                app:layout_constraintTop_toTopOf="parent">
+                android:orientation="horizontal">
 
-            </ImageView>
+                <TextView
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/compass_text_view"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    android:background="@drawable/rounded_gray_transparent_bg"
+                    android:textAlignment="center"
+                    />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/logo"
+                    android:layout_marginRight="30dp"
+                    />
+
+            </LinearLayout>
+
+
+
+
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="0dp"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:background="@color/white">
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/mapButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:background="@color/white"
                     android:text="지도 모드"
                     android:textColor="@color/black"></androidx.appcompat.widget.AppCompatButton>
 
-                <androidx.appcompat.widget.AppCompatButton
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+
+
+                <TextView
+                    android:id="@+id/trackingSteps"
                     android:layout_weight="1"
-                    android:background="@color/white"
-                    android:textColor="@color/black"
-                    android:visibility="invisible"></androidx.appcompat.widget.AppCompatButton>
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:background="@color/black"
+                    android:text="걸음수"
+                    android:textSize="30sp"
+                    android:textColor="@color/white"
+                    android:textAlignment="center"
+                    />
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/test_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:background="@color/white"
                     android:text="오류 제보"
@@ -167,28 +195,8 @@
         android:layout_margin="5dp"
         android:background="@drawable/rounded_gray_transparent_bg"/>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="2dp"
-        android:id="@+id/compass_text_view"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:background="@drawable/rounded_gray_transparent_bg"
-        />
-    <TextView
-        android:id="@+id/trackingSteps"
-        android:layout_marginTop="53dp"
-        android:layout_width="120dp"
-        android:layout_height="wrap_content"
-        android:background="@color/black"
-        app:layout_constraintEnd_toEndOf="@id/map_view"
-        app:layout_constraintStart_toStartOf="@id/map_view"
-        app:layout_constraintTop_toTopOf="@id/map_view"
-        android:text="걸음수"
-        android:textSize="35sp"
-        android:textColor="@color/white"
-        android:textAlignment="center"
-        />
+
+
     <androidx.appcompat.widget.SwitchCompat
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
