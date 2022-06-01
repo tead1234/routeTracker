@@ -90,11 +90,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
 
-                        if (binding.trackingSwitch.isChecked) it.moveCamera(
-                            CameraUpdate.scrollTo(
-                                coordinate
-                            )
-                        )
+                        if (binding.trackingSwitch.isChecked) {
+
+                            it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                        }
                     }
                 }
             }
@@ -320,14 +320,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         // 지도 모드/버튼 모드
         binding.mapButton.setOnClickListener {
             if (!mapMode) {
-                binding.testButton.visibility = View.INVISIBLE
+                //binding.testButton.visibility = View.INVISIBLE
                 binding.addButton.visibility = View.INVISIBLE
                 binding.fixButton.visibility = View.INVISIBLE
                 binding.trackingButton.visibility = View.INVISIBLE
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
-            } else {
-                binding.testButton.visibility = View.VISIBLE
+            } 
+            else {
+                //binding.testButton.visibility = View.VISIBLE
                 binding.addButton.visibility = View.VISIBLE
                 binding.fixButton.visibility = View.VISIBLE
                 binding.trackingButton.visibility = View.VISIBLE
@@ -357,6 +358,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
             locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
             locationOverlay.anchor = PointF(0.5f, 1f)
+
         }
         this.naverMap = naverMap
     }
