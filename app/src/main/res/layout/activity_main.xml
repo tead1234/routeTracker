@@ -63,17 +63,57 @@
             </LinearLayout>
 
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/tracking_button"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:background="#80008000"
-                android:text="안내 시작\n(화면 꽉차게 만들 예정)"
-                android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/tracking_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="230dp"
+                    android:background="#80008000"
+                    android:text="안내 시작"
+                    android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+
+                <Button
+                    android:id="@+id/test_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="오류 제보" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/fixButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="230dp"
+                        android:layout_weight="1"
+                        android:background="#80E91E63"
+                        android:text="음향신호기\n고장 신고"
+                        android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/addButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="230dp"
+                        android:layout_weight="1"
+                        android:background="#803F51B5"
+                        android:text="음향신호기\n설치 요청"
+                        android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+                </LinearLayout>
+            </LinearLayout>
 
         </LinearLayout>
+
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+
 
     <ProgressBar
         android:layout_width="35dp"

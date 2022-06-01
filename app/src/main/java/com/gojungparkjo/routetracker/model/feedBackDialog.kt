@@ -6,7 +6,9 @@ import android.content.Context
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings.Global.getString
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -14,11 +16,14 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.Window
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.MainActivity
 import com.gojungparkjo.routetracker.databinding.FeedbackdialogBinding
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import java.util.*
 import kotlin.system.exitProcess
 
@@ -29,7 +34,11 @@ class FeedBackDialog(private val context : AppCompatActivity) {
     private lateinit var mRecognizer: SpeechRecognizer
     private lateinit var recognitionListener: RecognitionListener//부모 액티비티의 context 가 들어감
     private lateinit var intent: Intent
+    private var flag =  false
+    val sharedPref = context.getPreferences(Context.MODE_PRIVATE)
+    val db = Firebase.firestore
 
+    @RequiresApi(Build.VERSION_CODES.FROYO)
     fun show(content: MainActivity) {
         binding = FeedbackdialogBinding.inflate(context.layoutInflater)
 
@@ -67,11 +76,7 @@ class FeedBackDialog(private val context : AppCompatActivity) {
             mRecognizer.setRecognitionListener(recognitionListener)
             mRecognizer.startListening(intent)
         }
-//
-//        binding.mic.setOnClickListener {
-//
-//            dlg.dismiss()
-//        }
+
 
         dlg.show()
     }
@@ -127,14 +132,23 @@ class FeedBackDialog(private val context : AppCompatActivity) {
             }
 
             override fun onResults(results: Bundle?) {
-                var matches: ArrayList<String> = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
-
-                for (i in 0 until matches.size) {
-//                    tvResult.text = matches[i]
-                    binding.yesBtn.text = matches[i]
+                if (!flag) {
+                    var matches: ArrayList<String> =
+                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
+                    val str = matches.joinToString(" ")
+                    val data = mapOf<String, Any?>("content" to str)
+                    db.collection("review").document().set(data).addOnCompleteListener {
+                        if (it.isSuccessful) {
+                            Toast.makeText(context, "평가를 등록했습니다.", Toast.LENGTH_SHORT).show()
+                            flag = true
+                            with (sharedPref.edit()) {
+                                putString("flag","true")
+                                apply()
+                            }
+                        }
+                    }
                 }
             }
-
             override fun onPartialResults(partialResults: Bundle?) {
 
             }
