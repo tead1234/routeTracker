@@ -450,9 +450,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
 //                        )
                         if(interSectionMap[nearestEntryPointIntersectionCode] != null){
-                            tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                            tts.speakOut("10미터 이내에 ${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
                         }else{
-                            tts.speakOut("${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                            tts.speakOut("10미터 이내에 ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
                         }
                         lastAnnounceTime = System.currentTimeMillis()
                     }
