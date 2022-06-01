@@ -118,7 +118,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private lateinit var sensorManager: SensorManager
 
     private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
-    private val permissionRequest = 101
     var checkAddFix: Boolean = false // true: add, false: fix
     var mapMode: Boolean = false // true: mapMode, false: buttonMode
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -145,25 +144,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         bindView()
         initMap()
         setupCompass()
-        smsSttSetup()
         checkPermissions()
+        smsSttSetup()
     }
 
 
     private fun smsSttSetup() {
-        // STT 관련 권한 요청
-        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            // 거부해도 계속 노출됨. ("다시 묻지 않음" 체크 시 노출 안됨)
-            // 허용은 한 번만 승인되면 그 다음부터 자동으로 허용됨
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.RECORD_AUDIO), 0
-            )
-        }
 
         var intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
@@ -755,6 +741,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.SEND_SMS
+            ) == PackageManager.PERMISSION_GRANTED&&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             startTracking(fusedLocationClient)
@@ -763,7 +757,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACTIVITY_RECOGNITION
+                    Manifest.permission.ACTIVITY_RECOGNITION,
+                    Manifest.permission.SEND_SMS,
+                    Manifest.permission.RECORD_AUDIO
                 )
             )
         }
