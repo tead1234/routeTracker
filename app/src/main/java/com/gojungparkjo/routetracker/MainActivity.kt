@@ -2,7 +2,9 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
@@ -48,6 +50,7 @@ import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
+import java.security.AccessController.getContext
 import kotlin.math.atan2
 import kotlin.math.min
 
@@ -65,6 +68,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     private val db = Firebase.firestore
     private lateinit var tts: TTS_Module
     private lateinit var compass: Compass
+    private var flag =  false
+    private lateinit var sharedPref: SharedPreferences
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -93,7 +98,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         if (binding.trackingSwitch.isChecked) {
 
                             it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
-                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
                     }
                 }
@@ -121,6 +126,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sharedPref= super.getPreferences(Context.MODE_PRIVATE)
         savedInstanceState?.let {
             if (it.keySet().contains(REQUESTING_CODE)) {
                 requesting = it.getBoolean(REQUESTING_CODE)
@@ -142,7 +148,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         smsSttSetup()
     }
 
-    // 음향 신호기 고장 신고/설치 요청 관련 초기 셋업 함수
+
     private fun smsSttSetup() {
 
         var intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -266,7 +272,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.trackingButton.setOnClickListener {
             if (guideMode) {
                 guideMode = false
-                binding.trackingButton.setBackgroundColor(Color.parseColor("#80BB86FC"))
+                binding.trackingButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.trackingButton.text = "안내 시작"
                 Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
             } else {
@@ -312,7 +318,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 binding.trackingButton.visibility = View.INVISIBLE
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
-            } 
+            }
             else {
                 //binding.testButton.visibility = View.VISIBLE
                 binding.addButton.visibility = View.VISIBLE
@@ -438,12 +444,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         }
                     }
                     if (nearestEntryPointDistanceInSight != Double.MAX_VALUE) {
-                        Log.d(
-                            TAG,
-                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
-                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
-                        )
-                        tts.speakOut("${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+//                        Log.d(
+//                            TAG,
+//                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
+//                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
+//                        )
+                        if(interSectionMap[nearestEntryPointIntersectionCode] != null){
+                            tts.speakOut("10미터 이내에 ${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                        }else{
+                            tts.speakOut("10미터 이내에 ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
+                        }
                         lastAnnounceTime = System.currentTimeMillis()
                     }
                 }
@@ -825,10 +835,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
         dig.show(this)
-        tts.speakOut("우리 어플을 평가해주세요")
+        val a = sharedPref.getString("flag", false.toString())
+        flag = a.toBoolean()
+        Toast.makeText(this,a, Toast.LENGTH_SHORT).show()
+        if(flag ==false){
+            tts.speakOut("어플을 평가해주세요")
+        }
+
     }
 
-}
+    }
+
+
 
 
 
