@@ -2,6 +2,7 @@ package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
@@ -10,6 +11,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -602,10 +604,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationPermissionRequest.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-
-                )
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                    )
             )
         }
         if (ContextCompat.checkSelfPermission(
@@ -688,10 +688,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     override fun onBackPressed() {
         val dig = FeedBackDialog(this)
         dig.show(this)
-        tts.speakOut("우리 어플을 평가해주세요")
+        tts.speakOut("어플을 평가해주세요")
     }
 
-}
+    }
+
+
 
 
 
