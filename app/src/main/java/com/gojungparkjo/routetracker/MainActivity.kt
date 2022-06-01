@@ -280,6 +280,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
                 binding.trackingButton.text = "안내 종료"
                 Toast.makeText(this, "안내를 시작합니다.", Toast.LENGTH_SHORT).show()
+                
                 guideMode = true
             }
         }
