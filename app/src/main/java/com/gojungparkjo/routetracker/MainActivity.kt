@@ -93,7 +93,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         if (binding.trackingSwitch.isChecked) {
 
                             it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
-                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
                     }
                 }
