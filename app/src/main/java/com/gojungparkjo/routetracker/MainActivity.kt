@@ -125,11 +125,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
 
-                        if (binding.trackingSwitch.isChecked) it.moveCamera(
-                            CameraUpdate.scrollTo(
-                                coordinate
-                            )
-                        )
+                        if (binding.trackingSwitch.isChecked) {
+
+                            it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
+                            it.moveCamera( CameraUpdate.zoomTo(18.0))
+                        }
                     }
                 }
             }
@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
     private lateinit var sensorManager: SensorManager
 
-    private var phoneNumber = "" // 최종본에는 120이 들어가야 함
+    private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
     private val permissionRequest = 101
     var checkAddFix : Boolean = false // true: add, false: fix
     var mapMode : Boolean = false // true: mapMode, false: buttonMode
@@ -300,7 +300,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         binding.trackingButton.setOnClickListener {
             if (requesting) {
                 stopTracking()
-                binding.trackingButton.setBackgroundColor(Color.parseColor("#80BB86FC"))
+                binding.trackingButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.trackingButton.text = "안내 시작"
                 Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
             } else {
@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         // 지도 모드/버튼 모드
         binding.mapButton.setOnClickListener {
             if (!mapMode) {
-                binding.testButton.visibility = View.INVISIBLE
+                //binding.testButton.visibility = View.INVISIBLE
                 binding.addButton.visibility = View.INVISIBLE
                 binding.fixButton.visibility = View.INVISIBLE
                 binding.trackingButton.visibility = View.INVISIBLE
@@ -343,7 +343,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 mapMode = true
             }
             else {
-                binding.testButton.visibility = View.VISIBLE
+                //binding.testButton.visibility = View.VISIBLE
                 binding.addButton.visibility = View.VISIBLE
                 binding.fixButton.visibility = View.VISIBLE
                 binding.trackingButton.visibility = View.VISIBLE
@@ -373,6 +373,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             locationOverlay.iconWidth = LocationOverlay.SIZE_AUTO
             locationOverlay.iconHeight = LocationOverlay.SIZE_AUTO
             locationOverlay.anchor = PointF(0.5f, 1f)
+
         }
         this.naverMap = naverMap
     }
