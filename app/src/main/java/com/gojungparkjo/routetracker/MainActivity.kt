@@ -13,6 +13,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import android.os.Build.VERSION_CODES.S
 import android.os.Bundle
 import android.os.Handler
 import android.speech.RecognitionListener
@@ -55,31 +56,49 @@ import kotlin.math.atan2
 import kotlin.math.min
 
 
-class MainActivity : AppCompatActivity(), SensorEventListener,
+class MainActivity : AppCompatActivity(),
     OnMapReadyCallback {
-
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     // 네이버지도 fusedLocationSource
     private lateinit var locationSource: FusedLocationSource
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val db = Firebase.firestore
     private val tmapLabelRepository = TmapLabelRepository()
     private val roadRepository = RoadRepository()
-    private var currentSteps = 0
-    private val db = Firebase.firestore
     private lateinit var tts: TTS_Module
     private lateinit var compass: Compass
-    private var flag =  false
+    private lateinit var stepCounter: StepCounter
     private lateinit var sharedPref: SharedPreferences
+    private lateinit var naverMap: NaverMap
+
+    lateinit var binding: ActivityMainBinding
+
+    private var flag = false
+    private var requesting = false
+    private var guideMode = false
+    var lastAnnounceTime = 0L
+
+    private var fetchAndMakeJob = Job().job
+    private var addShapeJob = Job().job
+    private var colorJob = Job().job
+
+    private val polygonMap =
+        HashMap<String, Triple<PolygonOverlay, Pair<LatLng, LatLng>, Pair<String, String>>>()
+    private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
+    private val polylineMap = HashMap<String, PolylineOverlay>()
+    private val trafficLightMap = HashMap<String, Marker>()
+    private val interSectionMap = HashMap<String, String>()
+
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if(permissions.all { result -> result.value == true }){
+        if (permissions.all { result -> result.value == true }) {
             startTracking(fusedLocationClient)
-        }else{
+        } else {
             Toast.makeText(this, "위치 권한을 주세요", Toast.LENGTH_SHORT).show()
             Handler().postDelayed(Runnable {
                 finish()
-            },3000)
+            }, 3000)
         }
     }
 
@@ -97,25 +116,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
                         if (binding.trackingSwitch.isChecked) {
 
-                            it.moveCamera( CameraUpdate.scrollTo( coordinate ) )
-                            it.moveCamera( CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
+                            it.moveCamera(CameraUpdate.scrollTo(coordinate))
+                            it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
                     }
                 }
             }
         }
     }
-
-
-    lateinit var binding: ActivityMainBinding
-
-    private lateinit var naverMap: NaverMap
-
-    private var requesting = false
-
-    private var addShapeJob = Job().job
-
-    private lateinit var sensorManager: SensorManager
 
     private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
     var checkAddFix: Boolean = false // true: add, false: fix
@@ -126,7 +134,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        sharedPref= super.getPreferences(Context.MODE_PRIVATE)
+        sharedPref = super.getPreferences(Context.MODE_PRIVATE)
         savedInstanceState?.let {
             if (it.keySet().contains(REQUESTING_CODE)) {
                 requesting = it.getBoolean(REQUESTING_CODE)
@@ -139,12 +147,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationSource = FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         bindView()
         initMap()
-        setupCompass()
         checkPermissions()
+        setupCompass()
+        setupStepCounter()
         smsSttSetup()
     }
 
@@ -248,7 +256,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         speechRecognizer.startListening(intent)
     }
 
-    var lastAnnounceTime = 0L
 
     private fun setupCompass() {
         compass = Compass(this)
@@ -261,6 +268,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 }
             }
         })
+    }
+
+    private fun setupStepCounter() {
+        stepCounter = StepCounter(this)
+        stepCounter.onNewStepCount = {
+            binding.trackingSteps.text = it.toString()
+        }
     }
 
     // 버튼 클릭 등 이벤트 관리
@@ -280,7 +294,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
                 binding.trackingButton.text = "안내 종료"
                 Toast.makeText(this, "안내를 시작합니다.", Toast.LENGTH_SHORT).show()
-                
+
                 guideMode = true
             }
         }
@@ -319,8 +333,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                 binding.trackingButton.visibility = View.INVISIBLE
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
-            }
-            else {
+            } else {
                 //binding.testButton.visibility = View.VISIBLE
                 binding.addButton.visibility = View.VISIBLE
                 binding.fixButton.visibility = View.VISIBLE
@@ -356,25 +369,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         this.naverMap = naverMap
     }
 
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event == null) return
-        if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
-            if (event.values[0] == 1.0f) {
-                currentSteps++
-                binding.trackingSteps.text = currentSteps.toString()
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {}
-
-    private var colorJob = Job().job
-
-    private var guideMode = false
-
     private fun findTrafficSignAndCrosswalkInSight(degree: Double) {
-        if(!guideMode) return
+        if (!guideMode) return
         if (fetchAndMakeJob.isActive) return
         if (this::naverMap.isInitialized) {
             if (colorJob.isActive) return
@@ -450,9 +446,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
 //                            "findTrafficSignAndCrosswalkInSight: " + "$nearestEntryPointIntersectionCode ${interSectionMap[nearestEntryPointIntersectionCode]} " +
 //                                    "${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.first else it.second }} 방면 횡단보도 입니다."
 //                        )
-                        if(interSectionMap[nearestEntryPointIntersectionCode] != null){
+                        if (interSectionMap[nearestEntryPointIntersectionCode] != null) {
                             tts.speakOut("10미터 이내에 ${interSectionMap[nearestEntryPointIntersectionCode]} ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
-                        }else{
+                        } else {
                             tts.speakOut("10미터 이내에 ${polygonMap[nearestEntryPointCrossWalkCode]?.third?.let { if (first) it.second else it.first }} 방면 횡단보도 입니다.")
                         }
                         lastAnnounceTime = System.currentTimeMillis()
@@ -462,14 +458,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
     }
-
-    private val polygonMap =
-        HashMap<String, Triple<PolygonOverlay, Pair<LatLng, LatLng>, Pair<String, String>>>()
-    private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
-    private val polylineMap = HashMap<String, PolylineOverlay>()
-    private val trafficLightMap = HashMap<String, Marker>()
-    private val interSectionMap = HashMap<String, String>()
-    private var fetchAndMakeJob = Job().job
 
     private fun fetchDataWithInBound(bound: LatLngBounds?) {
         if (naverMap.cameraPosition.zoom < 16) return
@@ -659,7 +647,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             }
         }
 
-
     private suspend fun addMarkerFromTrafficLightResponse(response: TrafficLightResponse) =
         withContext(Dispatchers.Default) {
             response.features?.forEach { feature ->
@@ -746,7 +733,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.SEND_SMS
-            ) == PackageManager.PERMISSION_GRANTED&&
+            ) == PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
@@ -790,34 +777,29 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 
-
     @SuppressLint("MissingPermission")
     override fun onResume() {
         super.onResume()
         compass.start()
-        sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)?.also { stepDetect ->
-            sensorManager.registerListener(
-                this,
-                stepDetect,
-                SensorManager.SENSOR_DELAY_FASTEST
-            )
-        }
+        stepCounter.start()
     }
 
     override fun onStart() {
         super.onStart()
         compass.start()
+        stepCounter.start()
     }
 
     override fun onPause() {
         super.onPause()
         compass.stop()
-        sensorManager.unregisterListener(this)
+        stepCounter.stop()
     }
 
     override fun onStop() {
         super.onStop()
         compass.stop()
+        stepCounter.stop()
     }
 
 
@@ -838,14 +820,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
         dig.show(this)
         val a = sharedPref.getString("flag", false.toString())
         flag = a.toBoolean()
-        Toast.makeText(this,a, Toast.LENGTH_SHORT).show()
-        if(flag ==false){
+        Toast.makeText(this, a, Toast.LENGTH_SHORT).show()
+        if (flag == false) {
             tts.speakOut("어플을 평가해주세요")
         }
 
     }
 
-    }
+}
 
 
 
