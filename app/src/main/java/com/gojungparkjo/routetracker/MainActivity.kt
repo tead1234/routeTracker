@@ -8,12 +8,6 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.os.Build
-import android.os.Build.VERSION_CODES.S
 import android.os.Bundle
 import android.os.Handler
 import android.speech.RecognitionListener
@@ -26,14 +20,11 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.data.TmapLabelRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
-import com.gojungparkjo.routetracker.model.FeedBackDialog
-import com.gojungparkjo.routetracker.model.TTS_Module
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
 import com.gojungparkjo.routetracker.model.intersection.InterSectionResponse
 import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
@@ -47,11 +38,11 @@ import com.naver.maps.map.*
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
+import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
-import java.security.AccessController.getContext
 import kotlin.math.atan2
 import kotlin.math.min
 
@@ -78,7 +69,7 @@ class MainActivity : AppCompatActivity(),
     private var guideMode = false
     var lastAnnounceTime = 0L
 
-    private var fetchAndMakeJob = Job().job
+    private var fetchAndMakeJob = Job().job.apply { cancel() }
     private var addShapeJob = Job().job
     private var colorJob = Job().job
 
@@ -461,26 +452,21 @@ class MainActivity : AppCompatActivity(),
 
     private fun fetchDataWithInBound(bound: LatLngBounds?) {
         if (naverMap.cameraPosition.zoom < 16) return
-        if (fetchAndMakeJob.isActive) fetchAndMakeJob.cancel()
+        if (fetchAndMakeJob.isActive) return
         if (addShapeJob.isActive) addShapeJob.cancel()
-        MainScope().launch {
-            binding.loadingView.visibility = View.VISIBLE
-            fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
-                if (bound == null) return@fetch
-                val interSectionResponse = roadRepository.getIntersectionInBound(bound)
-                interSectionResponse?.let { getInterSectionNameInBound(it) }
-                val trafficLights = roadRepository.getTrafficLightInBound(bound)
-                trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
-                val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
-                pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-                val trafficIslandResponse = roadRepository.getTrafficIslandInBound(bound)
-                trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-                val crossWalkResponse = roadRepository.getRoadInBound(bound)
-                crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
-            }
-            fetchAndMakeJob.join()
+        fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
+            if (bound == null) return@fetch
+            val interSectionResponse = roadRepository.getIntersectionInBound(bound)
+            interSectionResponse?.let { getInterSectionNameInBound(it) }
+            val trafficLights = roadRepository.getTrafficLightInBound(bound)
+            trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
+            val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
+            pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+            val trafficIslandResponse = roadRepository.getTrafficIslandInBound(bound)
+            trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+            val crossWalkResponse = roadRepository.getRoadInBound(bound)
+            crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
             addShapesWithInBound(bound)
-            binding.loadingView.visibility = View.INVISIBLE
         }
     }
 
