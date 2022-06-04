@@ -34,11 +34,13 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
-import com.naver.maps.map.*
+import com.naver.maps.map.CameraUpdate
+import com.naver.maps.map.MapFragment
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
-import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
@@ -466,8 +468,8 @@ class MainActivity : AppCompatActivity(),
             trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
             val crossWalkResponse = roadRepository.getRoadInBound(bound)
             crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
-            addShapesWithInBound(bound)
         }
+        addShapesWithInBound(bound)
     }
 
     private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse) =
@@ -672,12 +674,12 @@ class MainActivity : AppCompatActivity(),
 
     private fun addShapesWithInBound(bound: LatLngBounds?) {
         if (bound == null) return
-        if (fetchAndMakeJob.isActive) return
         if (addShapeJob.isActive) addShapeJob.cancel()
         if (colorJob.isActive) colorJob.cancel()
         addShapeJob = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.visibility = View.VISIBLE
 
+            if (fetchAndMakeJob.isActive) fetchAndMakeJob.join()
             if (naverMap.cameraPosition.zoom < 16) {
                 binding.loadingView.visibility = View.GONE
                 return@launch
