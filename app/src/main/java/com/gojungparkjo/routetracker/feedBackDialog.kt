@@ -1,4 +1,4 @@
-package com.gojungparkjo.routetracker.model
+package com.gojungparkjo.routetracker
 
 import android.Manifest
 import android.app.Dialog
@@ -8,19 +8,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings.Global.getString
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.util.Log
 import android.view.Window
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.gojungparkjo.routetracker.MainActivity
 import com.gojungparkjo.routetracker.databinding.FeedbackdialogBinding
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase

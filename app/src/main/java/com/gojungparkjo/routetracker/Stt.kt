@@ -1,4 +1,4 @@
-package com.gojungparkjo.routetracker.model
+package com.gojungparkjo.routetracker
 import android.content.Intent
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
