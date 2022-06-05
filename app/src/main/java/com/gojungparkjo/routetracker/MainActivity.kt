@@ -3,15 +3,11 @@ package com.gojungparkjo.routetracker
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
 import android.os.Bundle
-import android.os.Handler
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.util.Log
@@ -30,8 +26,6 @@ import com.gojungparkjo.routetracker.model.intersection.InterSectionResponse
 import com.gojungparkjo.routetracker.model.pedestrianroad.PedestrianRoadResponse
 import com.gojungparkjo.routetracker.model.trafficlight.TrafficLightResponse
 import com.google.android.gms.location.*
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.CameraUpdate
@@ -41,7 +35,6 @@ import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
-import kotlinx.coroutines.tasks.await
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
 import org.locationtech.proj4j.ProjCoordinate
@@ -55,12 +48,12 @@ class MainActivity : AppCompatActivity(),
     // 네이버지도 fusedLocationSource
     private lateinit var locationSource: FusedLocationSource
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val db = Firebase.firestore
     private val tmapLabelRepository = TmapLabelRepository()
     private val roadRepository = RoadRepository()
     private lateinit var tts: TTS_Module
     private lateinit var compass: Compass
     private lateinit var stepCounter: StepCounter
+    private lateinit var stt: Stt
     private lateinit var sharedPref: SharedPreferences
     private lateinit var naverMap: NaverMap
 
@@ -88,10 +81,11 @@ class MainActivity : AppCompatActivity(),
         if (permissions.all { result -> result.value == true }) {
             startTracking(fusedLocationClient)
         } else {
-            Toast.makeText(this, "위치 권한을 주세요", Toast.LENGTH_SHORT).show()
-            Handler().postDelayed(Runnable {
+            showToast("위치 권한을 주세요")
+            MainScope().launch {
+                delay(FINISH_DELAY)
                 finish()
-            }, 3000)
+            }
         }
     }
 
@@ -118,11 +112,9 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
+    private var phoneNumber = "01054240892" // 최종본에는 120이 들어가야 함
     var checkAddFix: Boolean = false // true: add, false: fix
     var mapMode: Boolean = false // true: mapMode, false: buttonMode
-    private lateinit var speechRecognizer: SpeechRecognizer
-    private lateinit var recognitionListener: RecognitionListener
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,87 +141,40 @@ class MainActivity : AppCompatActivity(),
         smsSttSetup()
     }
 
-
     private fun smsSttSetup() {
 
-        var intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+        stt = Stt(this,packageName)
 
-        // setListener
-        recognitionListener = object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                Toast.makeText(applicationContext, "음성인식을 시작합니다.", Toast.LENGTH_SHORT).show()
+        stt.onReadyForSpeech = {
+            showToast("음성인식을 시작합니다.")
+        }
+
+        stt.onResults = { results ->
+            val matches: ArrayList<String> =
+                results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
+            val smsManager: SmsManager = SmsManager.getDefault()
+            var symptom = ""
+            for (i in 0 until matches.size) {
+                symptom = matches[i]
             }
-
-            override fun onBeginningOfSpeech() {
-            }
-
-            override fun onRmsChanged(rmsdB: Float) {
-            }
-
-            override fun onBufferReceived(buffer: ByteArray?) {
-            }
-
-            override fun onEndOfSpeech() {
-            }
-
-            override fun onError(error: Int) {
-                var message: String
-
-                when (error) {
-                    SpeechRecognizer.ERROR_AUDIO ->
-                        message = "오디오 에러"
-                    SpeechRecognizer.ERROR_CLIENT ->
-                        message = "클라이언트 에러"
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
-                        message = "퍼미션 에러"
-                    SpeechRecognizer.ERROR_NETWORK ->
-                        message = "네트워크 에러"
-                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                        message = "네트워크 타임아웃"
-                    SpeechRecognizer.ERROR_NO_MATCH ->
-                        message = "소리가 들리지 않았거나 적절한 변경 단어를 찾지 못함"
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
-                        message = "RECOGNIZER_BUSY 에러"
-                    SpeechRecognizer.ERROR_SERVER ->
-                        message = "서버 에러"
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                        message = "말하는 시간 초과"
-                    else ->
-                        message = "알 수 없는 오류"
-                }
-                Toast.makeText(applicationContext, "에러 발생: $message", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onResults(results: Bundle?) {
-                var matches: ArrayList<String> =
-                    results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) as ArrayList<String>
-                val smsManager: SmsManager = SmsManager.getDefault()
-                var symptom = ""
-                for (i in 0 until matches.size) {
-                    symptom = matches[i]
-                }
-                var reportType = if (checkAddFix) "설치 요청" else "고장 신고"
-                var myMsg = "음향신호기 ${reportType}합니다.\n" +
-                        "증상은 ${symptom}."
-                var reportLocation = "https://m.map.naver.com/appLink.naver?app=Y&pinType=site&" +
-                        "lng=${naverMap.locationOverlay.position.longitude}&appMenu=location&menu=location&version=2&" +
-                        "lat=${naverMap.locationOverlay.position.latitude}"
+            val reportType = if (checkAddFix) "설치 요청" else "고장 신고"
+            val myMsg = "음향신호기 ${reportType}합니다.\n" +
+                    "증상은 ${symptom}."
+            val reportLocation = "https://m.map.naver.com/appLink.naver?app=Y&pinType=site&" +
+                    "lng=${naverMap.locationOverlay.position.longitude}&appMenu=location&menu=location&version=2&" +
+                    "lat=${naverMap.locationOverlay.position.latitude}"
 //                checkMsgSend(symptom)
 
-                // 일정 글자수 초과시 발송되지 않는 것으로 보임
-                smsManager.sendTextMessage(phoneNumber, null, myMsg, null, null)
-                smsManager.sendTextMessage(phoneNumber, null, reportLocation, null, null)
-                sendMessage()
-            }
-
-            override fun onPartialResults(partialResults: Bundle?) {
-            }
-
-            override fun onEvent(eventType: Int, params: Bundle?) {
-            }
+            // 일정 글자수 초과시 발송되지 않는 것으로 보임
+            smsManager.sendTextMessage(phoneNumber, null, myMsg, null, null)
+            smsManager.sendTextMessage(phoneNumber, null, reportLocation, null, null)
+            showToast("메시지를 보냈습니다.")
         }
+
+        stt.onError = { errorMessage ->
+            showToast("에러 발생: $errorMessage")
+        }
+
     }
 
     // msp 다이얼로그에서 보내기 누르면 발송하도록 구현하고 싶은 상황, 현재 미구현
@@ -239,16 +184,6 @@ class MainActivity : AppCompatActivity(),
         msp.show(this)
     }
 
-    fun sendMessage() {
-        Toast.makeText(this, "메시지를 보냈습니다.", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun startSpeech() {
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer.setRecognitionListener(recognitionListener)
-        speechRecognizer.startListening(intent)
-    }
-
 
     private fun setupCompass() {
         compass = Compass(this)
@@ -256,7 +191,7 @@ class MainActivity : AppCompatActivity(),
             override fun onNewAzimuth(azimuth: Float) {
                 binding.compassTextView.text = azimuth.toInt().toString()
                 if (::naverMap.isInitialized) naverMap.locationOverlay.bearing = azimuth
-                if (System.currentTimeMillis() - lastAnnounceTime > 5000) {
+                if (System.currentTimeMillis() - lastAnnounceTime > ANNOUNCE_INTERVAL) {
                     findTrafficSignAndCrosswalkInSight(azimuth.toDouble())
                 }
             }
@@ -281,36 +216,35 @@ class MainActivity : AppCompatActivity(),
                 guideMode = false
                 binding.trackingButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.trackingButton.text = "안내 시작"
-                Toast.makeText(this, "안내를 종료합니다.", Toast.LENGTH_SHORT).show()
+                showToast("안내를 종료합니다.")
             } else {
                 checkPermissions()
                 binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
                 binding.trackingButton.text = "안내 종료"
-                Toast.makeText(this, "안내를 시작합니다.", Toast.LENGTH_SHORT).show()
+                showToast("안내를 시작합니다.")
 
                 guideMode = true
             }
-        }
-        binding.infoTextView.setOnClickListener {
-            it.visibility = View.GONE
         }
         // 음향신호기 고장 신고/설치 요청
         binding.fixButton.setOnClickListener {
             checkAddFix = false
             tts.speakOut("고장 신고 버튼을 누르셨습니다. 증상을 말씀해주세요.")
-            Handler().postDelayed(java.lang.Runnable {
-                startSpeech()
-            }, 5000)
+            MainScope().launch {
+                delay(STT_DELAY)
+                stt.startSpeech()
+            }
         }
         binding.addButton.setOnClickListener {
             checkAddFix = true
             tts.speakOut("설치 요청 버튼을 누르셨습니다. 증상을 말씀해주세요.")
-            Handler().postDelayed(java.lang.Runnable {
-                startSpeech()
-            }, 5000)
+            MainScope().launch {
+                delay(STT_DELAY)
+                stt.startSpeech()
+            }
         }
         // 테스트(오류 제보) 버튼
-        binding.testButton.setOnClickListener {
+        binding.bugReportButton.setOnClickListener {
             val bundle = Bundle().apply {
                 putParcelable("position", getCurrentPosition())
             }
@@ -320,17 +254,15 @@ class MainActivity : AppCompatActivity(),
         // 지도 모드/버튼 모드
         binding.mapButton.setOnClickListener {
             if (!mapMode) {
-                //binding.testButton.visibility = View.INVISIBLE
-                binding.addButton.visibility = View.INVISIBLE
-                binding.fixButton.visibility = View.INVISIBLE
-                binding.trackingButton.visibility = View.INVISIBLE
+                binding.addButton.toInvisible()
+                binding.fixButton.toInvisible()
+                binding.trackingButton.toInvisible()
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
             } else {
-                //binding.testButton.visibility = View.VISIBLE
-                binding.addButton.visibility = View.VISIBLE
-                binding.fixButton.visibility = View.VISIBLE
-                binding.trackingButton.visibility = View.VISIBLE
+                binding.addButton.toVisible()
+                binding.fixButton.toVisible()
+                binding.trackingButton.toVisible()
                 binding.mapButton.text = "지도 모드"
                 mapMode = false
             }
@@ -425,7 +357,7 @@ class MainActivity : AppCompatActivity(),
                             // 최단 거리보다 가까우면 최단거리 갱신
                             nearestEntryPointDistanceInSight = minPointDistance
                             // 횡단보도 정보 저장
-                            (polygon.first.tag as List<String>).also {
+                            (polygon.first.tag as? List<String>)?.also {
                                 nearestEntryPointIntersectionCode = it[0]
                                 nearestEntryPointCrossWalkCode = it[1]
                             }
@@ -489,11 +421,6 @@ class MainActivity : AppCompatActivity(),
                             coords = list; color = Color.WHITE
                             outlineWidth = 5; outlineColor = Color.RED
                             tag = feature.properties.toString()
-                            setOnClickListener {
-                                binding.infoTextView.text = it.tag.toString()
-                                binding.infoTextView.visibility = View.VISIBLE
-                                true
-                            }
                         }
                     }
                 }
@@ -521,11 +448,6 @@ class MainActivity : AppCompatActivity(),
                             feature.properties.cSSCDE.toString().trim(),
                             feature.properties.mGRNU
                         )
-                        setOnClickListener {
-                            binding.infoTextView.text = it.tag.toString()
-                            binding.infoTextView.visibility = View.VISIBLE
-                            true
-                        }
                     }
 
                     // 최소 사각형
@@ -571,18 +493,16 @@ class MainActivity : AppCompatActivity(),
                         }
                     }
 
-                    var mainMidLine: List<LatLng>
-                    var label1: String
-                    var label2: String
+                    val mainMidLine: List<LatLng>
+                    val label1: String
+                    val label2: String
 
-                    if (midLine1Intersect > midLine2Intersect) {
-                        mainMidLine = lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
-
+                    mainMidLine = if (midLine1Intersect > midLine2Intersect) {
+                        lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
                     } else if (midLine1Intersect < midLine2Intersect) {
-                        mainMidLine = lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
+                        lengthenLine(middlePoints[1], middlePoints[3], 0.00020)
                     } else {
-                        mainMidLine =
-                            listOf(rectangleCoord[0].toLatLng(), rectangleCoord[2].toLatLng())
+                        listOf(rectangleCoord[0].toLatLng(), rectangleCoord[2].toLatLng())
                     }
 
                     label1 =
@@ -619,7 +539,6 @@ class MainActivity : AppCompatActivity(),
                             zIndex = 20003
                             if (midLine1Intersect > midLine2Intersect) color =
                                 Color.MAGENTA
-                            setOnClickListener { it.map = null; true }
                         }
 
                     polylineMap[feature.properties.mGRNU + "L2"] =
@@ -627,10 +546,7 @@ class MainActivity : AppCompatActivity(),
                             zIndex = 20003
                             if (midLine1Intersect < midLine2Intersect) color =
                                 Color.MAGENTA
-                            setOnClickListener { it.map = null; true }
                         }
-
-
                 }
             }
         }
@@ -645,13 +561,8 @@ class MainActivity : AppCompatActivity(),
                 feature.properties.let { property ->
                     if (property.sNLPKNDCDE == "007" && property.xCE != null && property.yCE != null) {
                         feature.geometry?.coordinates?.first {
-                            val info =
-                                db.collection("trafficSignGuideInfo").document(property.mGRNU).get()
-                                    .await()
                             trafficLightMap[feature.properties.mGRNU] =
-                                Marker(ProjCoordinate(it[0], it[1]).toLatLng()).apply {
-                                    tag = info.get("line") ?: "신호등 정보가 없습니다."
-                                }
+                                Marker(ProjCoordinate(it[0], it[1]).toLatLng())
                             true
                         }
                     }
@@ -677,11 +588,11 @@ class MainActivity : AppCompatActivity(),
         if (addShapeJob.isActive) addShapeJob.cancel()
         if (colorJob.isActive) colorJob.cancel()
         addShapeJob = CoroutineScope(Dispatchers.Main).launch {
-            binding.loadingView.visibility = View.VISIBLE
+            binding.loadingView.toVisible()
 
             if (fetchAndMakeJob.isActive) fetchAndMakeJob.join()
-            if (naverMap.cameraPosition.zoom < 16) {
-                binding.loadingView.visibility = View.GONE
+            if (naverMap.cameraPosition.zoom < MINIMUM_ZOOM_LEVEL) {
+                binding.loadingView.toGone()
                 return@launch
             }
 
@@ -701,7 +612,7 @@ class MainActivity : AppCompatActivity(),
                     if (bound.contains(polyline.bounds) || bound.intersects(polyline.bounds)) naverMap else null
             }
 
-            binding.loadingView.visibility = View.GONE
+            binding.loadingView.toGone()
         }
     }
 
@@ -790,13 +701,20 @@ class MainActivity : AppCompatActivity(),
         stepCounter.stop()
     }
 
-
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(REQUESTING_CODE, requesting)
         super.onSaveInstanceState(outState)
     }
 
+    private fun showToast(msg:String){
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
     companion object {
+        const val MINIMUM_ZOOM_LEVEL = 16
+        const val STT_DELAY = 5000L
+        const val FINISH_DELAY = 3000L
+        const val ANNOUNCE_INTERVAL = 5000
         const val REQUESTING_CODE = "100"
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
         private const val TAG = "MainActivity"
@@ -809,16 +727,11 @@ class MainActivity : AppCompatActivity(),
         val a = sharedPref.getString("flag", false.toString())
         flag = a.toBoolean()
         Toast.makeText(this, a, Toast.LENGTH_SHORT).show()
-        if (flag == false) {
+        if (!flag) {
             tts.speakOut("어플을 평가해주세요")
         }
 
     }
 
 }
-
-
-
-
-
 

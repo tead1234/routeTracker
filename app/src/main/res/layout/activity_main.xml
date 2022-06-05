@@ -88,7 +88,7 @@
                     />
 
                 <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/test_button"
+                    android:id="@+id/bug_report_button"
                     android:layout_width="0dp"
                     android:layout_height="50dp"
                     android:layout_weight="1"
