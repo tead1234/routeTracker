@@ -410,7 +410,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener,
                         //둘 중 가까운 점의 좌표
                         val nearPoint =
                             if (firstPointDistance < secondPointDistance) polygon.second.first else polygon.second.second
-                        //가까운 점과의 각도
+                        //가까운 점과의 각도g
                         val angle = atan2(
                             nearPoint.longitude - map.locationOverlay.position.longitude,
                             nearPoint.latitude - map.locationOverlay.position.latitude
