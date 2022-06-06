@@ -206,6 +206,9 @@ class MainActivity : AppCompatActivity(),
         stepCounter.onNewStepCount = {
             binding.trackingSteps.text = it.toString()
         }
+        binding.trackingSteps.setOnClickListener({
+            tts.speakOut(binding.trackingSteps.text.toString()+"걸음입니다.")
+        })
     }
 
     // 버튼 클릭 등 이벤트 관리
@@ -335,7 +338,7 @@ class MainActivity : AppCompatActivity(),
                         //둘 중 가까운 점의 좌표
                         val nearPoint =
                             if (firstPointDistance < secondPointDistance) polygon.second.first else polygon.second.second
-                        //가까운 점과의 각도
+                        //가까운 점과의 각도g
                         val angle = atan2(
                             nearPoint.longitude - map.locationOverlay.position.longitude,
                             nearPoint.latitude - map.locationOverlay.position.latitude

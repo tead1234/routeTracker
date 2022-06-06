@@ -14,10 +14,10 @@
 
 
     <ImageButton
-        android:layout_width="match_parent"
         android:id="@+id/mic"
-        android:layout_height="102dp"
-        android:src="@drawable/ic_launcher_background" />
+        android:layout_width="match_parent"
+        android:layout_height="63dp"
+        android:src="@drawable/ic_mic2" />
 
     <Button
         android:id="@+id/yesBtn"
