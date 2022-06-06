@@ -13,14 +13,142 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/tracking_button"
+        app:layout_constraintBottom_toTopOf="@id/tracking_button_fake"
         >
 
         <fragment android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:id="@+id/map"
+            tools:visibility="gone"
             android:name="com.naver.maps.map.MapFragment" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#0DFFFFFF"
+            android:orientation="vertical">
+
+
+            <LinearLayout
+                android:background="@color/white"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/compass_text_view"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    android:background="@drawable/rounded_gray_transparent_bg"
+                    android:textAlignment="center"
+                    />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/logo"
+                    android:layout_marginRight="30dp"
+                    />
+
+            </LinearLayout>
+
+
+
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@color/white">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/mapButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:text="지도 모드"
+                    android:textColor="@color/black"></androidx.appcompat.widget.AppCompatButton>
+
+
+
+                <TextView
+                    android:id="@+id/trackingSteps"
+                    android:layout_weight="1"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:background="@color/black"
+                    android:text="걸음수"
+                    android:textSize="30sp"
+                    android:textColor="@color/white"
+                    android:textAlignment="center"
+                    />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/bug_report_button"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:text="오류 제보"
+                    android:textColor="@color/black"></androidx.appcompat.widget.AppCompatButton>
+
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <androidx.appcompat.widget.AppCompatButton
+
+                    android:id="@+id/tracking_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="300dp"
+                    android:background="#80008000"
+                    android:text="안내 시작"
+                    android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+
+
+
+                <LinearLayout
+
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/fixButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="#80E91E63"
+                        android:text="음향신호기\n고장 신고"
+                        android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/addButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="#803F51B5"
+                        android:text="음향신호기\n설치 요청"
+                        android:textSize="40dp"></androidx.appcompat.widget.AppCompatButton>
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
     <ProgressBar
         android:layout_width="35dp"
         android:layout_height="35dp"
@@ -30,18 +158,21 @@
         app:layout_constraintEnd_toEndOf="@id/map_view"/>
 
 
-    <Button
-        android:id="@+id/tracking_button"
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/tracking_button_fake"
         app:layout_constraintTop_toBottomOf="@id/map_view"
         app:layout_constraintBottom_toBottomOf="@id/text_view"
         android:layout_width="match_parent"
-        android:text="TRACKING START"
-        android:layout_height="wrap_content"/>
+        android:text=""
+        android:background="#80008000"
+        android:layout_height="2dp"
+        android:clickable="false"
+        android:visibility="invisible"/>
     <TextView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="2dp"
         app:layout_constraintBottom_toTopOf="@id/near_text_view"
-        app:layout_constraintTop_toBottomOf="@id/tracking_button"
+        app:layout_constraintTop_toBottomOf="@id/tracking_button_fake"
         app:layout_constraintStart_toStartOf="parent"
         android:id="@+id/text_view"
         />
@@ -60,17 +191,22 @@
         android:id="@+id/info_text_view"
         android:visibility="gone"
         android:padding="5dp"
-        app:layout_constraintBottom_toTopOf="@id/tracking_button"
+        app:layout_constraintBottom_toTopOf="@id/tracking_button_fake"
         android:layout_margin="5dp"
         android:background="@drawable/rounded_gray_transparent_bg"/>
 
-    <TextView
+
+
+    <androidx.appcompat.widget.SwitchCompat
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/compass_text_view"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:background="@drawable/rounded_gray_transparent_bg"
+        app:layout_constraintEnd_toEndOf="@id/map_view"
+        app:layout_constraintBottom_toBottomOf="@id/map_view"
+        android:layout_margin="8dp"
+        android:id="@+id/tracking_switch"
+        android:background="@color/gray_a70"
+        android:checked="true"
+        android:visibility="invisible"
         />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
