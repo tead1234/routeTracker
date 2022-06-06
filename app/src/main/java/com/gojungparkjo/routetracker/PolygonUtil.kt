@@ -248,4 +248,4 @@ fun PolygonArea(polygon: Array<Point>, N: Int): BigDecimal {
 }
 
 fun PolygonOverlay.minimumRectangle(): PolygonOverlay =
-    PolygonOverlay((MinimumDiameter(GeometryFactory().createPolygon(this.coords.map { Coordinate(it.latitude,it.longitude) }.toTypedArray())).minimumRectangle).coordinates.map { LatLng(it.x,it.y) })
+    PolygonOverlay((MinimumDiameter(GeometryFactory().createPolygon(this.coords.map { it.toCoordinate() }.toTypedArray())).minimumRectangle).coordinates.map { it.toLatLng() })
