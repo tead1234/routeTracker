@@ -1,9 +1,11 @@
-package com.gojungparkjo.routetracker.model
+package com.gojungparkjo.routetracker
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Button
+import android.widget.Toast
+import com.gojungparkjo.routetracker.MainActivity
 import java.util.*
 
 class TTS_Module(context:Context):TextToSpeech.OnInitListener {
