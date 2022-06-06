@@ -12,11 +12,11 @@ import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.data.TmapLabelRepository
@@ -35,15 +35,10 @@ import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
-import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
-import org.locationtech.jts.geom.Point
-import org.locationtech.jts.operation.buffer.BufferOp
 import org.locationtech.proj4j.ProjCoordinate
-import kotlin.math.absoluteValue
 import kotlin.math.atan2
-import kotlin.math.log
 import kotlin.math.min
 
 
@@ -69,9 +64,9 @@ class MainActivity : AppCompatActivity(),
     private var guideMode = false
     var lastAnnounceTime = 0L
 
-    private var fetchAndMakeJob = Job().job.apply { cancel() }
-    private var addShapeJob = Job().job
-    private var colorJob = Job().job
+    private var fetchAndMakeJob: Job = Job().apply { complete() }
+    private var addShapeJob: Job = Job()
+    private var findJob: Job = Job()
 
     private val polygonMap =
         HashMap<String, Triple<PolygonOverlay, Pair<LatLng, LatLng>, Pair<String, String>>>()
@@ -80,8 +75,8 @@ class MainActivity : AppCompatActivity(),
     private val trafficLightMap = HashMap<String, Marker>()
     private val interSectionMap = HashMap<String, String>()
 
-    private var validBound : LatLngBounds? = null
-    private var validBoundPolygon : PolygonOverlay? = null
+    private var validBound: LatLngBounds? = null
+    private var validBoundPolygon: PolygonOverlay? = null
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -151,7 +146,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun smsSttSetup() {
 
-        stt = Stt(this,packageName)
+        stt = Stt(this, packageName)
 
         stt.onReadyForSpeech = {
             showToast("음성인식을 시작합니다.")
@@ -306,8 +301,8 @@ class MainActivity : AppCompatActivity(),
         if (!guideMode) return
         if (fetchAndMakeJob.isActive) return
         if (this::naverMap.isInitialized) {
-            if (colorJob.isActive) return
-            colorJob = MainScope().launch {
+            if (findJob.isActive) return
+            findJob = MainScope().launch {
                 naverMap.let { map ->
 //                    trafficLightMap.forEach { (_, trafficLight) ->
 //                        val temp = atan2(
@@ -394,13 +389,12 @@ class MainActivity : AppCompatActivity(),
 
     private fun fetchDataWithInBound(bound: LatLngBounds?) {
         if (naverMap.cameraPosition.zoom < 16) return
-        if (validBound?.contains(naverMap.locationOverlay.position)==true) return
-        Log.d(TAG, "fetchDataWithInBound: bound check pass")
+        if (validBound?.contains(naverMap.locationOverlay.position) == true) return
         if (fetchAndMakeJob.isActive) return
         if (addShapeJob.isActive) addShapeJob.cancel()
         fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
             if (bound == null) return@fetch
-            val job = launch{
+            val job = launch {
                 launch {
                     val interSectionResponse = roadRepository.getIntersectionInBound(bound)
                     interSectionResponse?.let { getInterSectionNameInBound(it) }
@@ -418,27 +412,32 @@ class MainActivity : AppCompatActivity(),
                     trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
                 }
             }
-            val crossWalkResponse = async {roadRepository.getRoadInBound(bound)}
+            val crossWalkResponse = async { roadRepository.getRoadInBound(bound) }
             job.join()
             crossWalkResponse.await()?.let { addPolygonFromCrossWalkResponse(it) }
-            validBound = bound.scaleByWeight(-0.15).also {
-                Log.d(TAG, "fetchDataWithInBound: $it")
-            }
+            validBound = bound.scaleByWeight(-0.15)
             MainScope().launch {
                 validBoundPolygon?.map = null
                 validBoundPolygon = validBound?.vertexes
-                    ?.let { PolygonOverlay(it.toList()).apply { color = Color.parseColor("#80FF0000");zIndex =20003 } }
+                    ?.let {
+                        PolygonOverlay(it.toList()).apply {
+                            outlineWidth = 3;color = Color.TRANSPARENT
+                            outlineColor = Color.parseColor("#80FF0000");zIndex = 20003
+                        }
+                    }
                 validBoundPolygon?.map = naverMap
             }
         }
         addShapesWithInBound(bound)
     }
 
-    fun LatLngBounds.scaleByWeight(w:Double):LatLngBounds{
+    fun LatLngBounds.scaleByWeight(w: Double): LatLngBounds {
         val width = vertexes[2].longitude - vertexes[0].longitude
         val height = vertexes[1].latitude - vertexes[0].latitude
-        return LatLngBounds(LatLng(vertexes[0].latitude - height*w,vertexes[0].longitude - width*w),
-            LatLng(vertexes[2].latitude + height*w,vertexes[2].longitude + width*w))
+        return LatLngBounds(
+            LatLng(vertexes[0].latitude - height * w, vertexes[0].longitude - width * w),
+            LatLng(vertexes[2].latitude + height * w, vertexes[2].longitude + width * w)
+        )
     }
 
     private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse) =
@@ -531,8 +530,6 @@ class MainActivity : AppCompatActivity(),
                     }
 
                     val mainMidLine: List<LatLng>
-                    val label1: String
-                    val label2: String
 
                     mainMidLine = if (midLine1Intersect > midLine2Intersect) {
                         lengthenLine(middlePoints[0], middlePoints[2], 0.00020)
@@ -542,10 +539,10 @@ class MainActivity : AppCompatActivity(),
                         listOf(rectangleCoord[0].toLatLng(), rectangleCoord[2].toLatLng())
                     }
 
-                    label1 =
+                    val label1: String =
                         tmapLabelRepository.getLabelFromLatLng(mainMidLine[0])?.poiInfo?.name
                             ?: ""
-                    label2 =
+                    val label2: String =
                         tmapLabelRepository.getLabelFromLatLng(mainMidLine[1])?.poiInfo?.name
                             ?: ""
                     Log.d(TAG, "addPolygonFromCrossWalkResponse: $label1")
@@ -623,7 +620,7 @@ class MainActivity : AppCompatActivity(),
     private fun addShapesWithInBound(bound: LatLngBounds?) {
         if (bound == null) return
         if (addShapeJob.isActive) addShapeJob.cancel()
-        if (colorJob.isActive) colorJob.cancel()
+        if (findJob.isActive) findJob.cancel()
         addShapeJob = CoroutineScope(Dispatchers.Main).launch {
             binding.loadingView.toVisible()
 
@@ -743,7 +740,7 @@ class MainActivity : AppCompatActivity(),
         super.onSaveInstanceState(outState)
     }
 
-    private fun showToast(msg:String){
+    private fun showToast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
