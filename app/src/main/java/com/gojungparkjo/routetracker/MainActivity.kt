@@ -267,7 +267,6 @@ class MainActivity : AppCompatActivity(),
                 binding.trackingButton.toInvisible()
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
-                stopTracking()
             } else {
                 binding.addButton.toVisible()
                 binding.fixButton.toVisible()
