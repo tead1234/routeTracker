@@ -35,10 +35,15 @@ import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.*
 import com.naver.maps.map.util.FusedLocationSource
 import kotlinx.coroutines.*
+import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineSegment
+import org.locationtech.jts.geom.Point
+import org.locationtech.jts.operation.buffer.BufferOp
 import org.locationtech.proj4j.ProjCoordinate
+import kotlin.math.absoluteValue
 import kotlin.math.atan2
+import kotlin.math.log
 import kotlin.math.min
 
 
@@ -74,6 +79,9 @@ class MainActivity : AppCompatActivity(),
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
     private val interSectionMap = HashMap<String, String>()
+
+    private var validBound : LatLngBounds? = null
+    private var validBoundPolygon : PolygonOverlay? = null
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -259,6 +267,7 @@ class MainActivity : AppCompatActivity(),
                 binding.trackingButton.toInvisible()
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
+                stopTracking()
             } else {
                 binding.addButton.toVisible()
                 binding.fixButton.toVisible()
@@ -386,6 +395,8 @@ class MainActivity : AppCompatActivity(),
 
     private fun fetchDataWithInBound(bound: LatLngBounds?) {
         if (naverMap.cameraPosition.zoom < 16) return
+        if (validBound?.contains(naverMap.locationOverlay.position)==true) return
+        Log.d(TAG, "fetchDataWithInBound: bound check pass")
         if (fetchAndMakeJob.isActive) return
         if (addShapeJob.isActive) addShapeJob.cancel()
         fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
@@ -411,8 +422,24 @@ class MainActivity : AppCompatActivity(),
             val crossWalkResponse = async {roadRepository.getRoadInBound(bound)}
             job.join()
             crossWalkResponse.await()?.let { addPolygonFromCrossWalkResponse(it) }
+            validBound = bound.scaleByWeight(-0.15).also {
+                Log.d(TAG, "fetchDataWithInBound: $it")
+            }
+            MainScope().launch {
+                validBoundPolygon?.map = null
+                validBoundPolygon = validBound?.vertexes
+                    ?.let { PolygonOverlay(it.toList()).apply { color = Color.parseColor("#80FF0000");zIndex =20003 } }
+                validBoundPolygon?.map = naverMap
+            }
         }
         addShapesWithInBound(bound)
+    }
+
+    fun LatLngBounds.scaleByWeight(w:Double):LatLngBounds{
+        val width = vertexes[2].longitude - vertexes[0].longitude
+        val height = vertexes[1].latitude - vertexes[0].latitude
+        return LatLngBounds(LatLng(vertexes[0].latitude - height*w,vertexes[0].longitude - width*w),
+            LatLng(vertexes[2].latitude + height*w,vertexes[2].longitude + width*w))
     }
 
     private suspend fun addPolygonFromPedestrianRoadResponse(response: PedestrianRoadResponse) =
