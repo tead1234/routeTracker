@@ -1,6 +1,5 @@
 package com.gojungparkjo.routetracker
 
-import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
 import com.naver.maps.geometry.LatLng
 import org.locationtech.proj4j.CRSFactory
 import org.locationtech.proj4j.CoordinateTransformFactory
