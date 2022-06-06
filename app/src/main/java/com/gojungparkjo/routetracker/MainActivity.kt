@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private var phoneNumber = "01054240892" // 최종본에는 120이 들어가야 함
+    private var phoneNumber = "01033433317" // 최종본에는 120이 들어가야 함
     var checkAddFix: Boolean = false // true: add, false: fix
     var mapMode: Boolean = false // true: mapMode, false: buttonMode
 
@@ -390,16 +390,27 @@ class MainActivity : AppCompatActivity(),
         if (addShapeJob.isActive) addShapeJob.cancel()
         fetchAndMakeJob = CoroutineScope(Dispatchers.IO).launch fetch@{
             if (bound == null) return@fetch
-            val interSectionResponse = roadRepository.getIntersectionInBound(bound)
-            interSectionResponse?.let { getInterSectionNameInBound(it) }
-            val trafficLights = roadRepository.getTrafficLightInBound(bound)
-            trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
-            val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
-            pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-            val trafficIslandResponse = roadRepository.getTrafficIslandInBound(bound)
-            trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
-            val crossWalkResponse = roadRepository.getRoadInBound(bound)
-            crossWalkResponse?.let { addPolygonFromCrossWalkResponse(it) }
+            val job = launch{
+                launch {
+                    val interSectionResponse = roadRepository.getIntersectionInBound(bound)
+                    interSectionResponse?.let { getInterSectionNameInBound(it) }
+                }
+                launch {
+                    val trafficLights = roadRepository.getTrafficLightInBound(bound)
+                    trafficLights?.let { addMarkerFromTrafficLightResponse(it) }
+                }
+                launch {
+                    val pedestrianRoadResponse = roadRepository.getPedestrianRoadInBound(bound)
+                    pedestrianRoadResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+                }
+                launch {
+                    val trafficIslandResponse = roadRepository.getTrafficIslandInBound(bound)
+                    trafficIslandResponse?.let { addPolygonFromPedestrianRoadResponse(it) }
+                }
+            }
+            val crossWalkResponse = async {roadRepository.getRoadInBound(bound)}
+            job.join()
+            crossWalkResponse.await()?.let { addPolygonFromCrossWalkResponse(it) }
         }
         addShapesWithInBound(bound)
     }
