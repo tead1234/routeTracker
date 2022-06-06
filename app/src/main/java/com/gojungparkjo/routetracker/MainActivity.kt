@@ -206,6 +206,9 @@ class MainActivity : AppCompatActivity(),
         stepCounter.onNewStepCount = {
             binding.trackingSteps.text = it.toString()
         }
+        binding.trackingSteps.setOnClickListener({
+            tts.speakOut(binding.trackingSteps.text.toString()+"걸음입니다.")
+        })
     }
 
     // 버튼 클릭 등 이벤트 관리
