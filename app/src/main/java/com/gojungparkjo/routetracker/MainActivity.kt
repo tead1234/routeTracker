@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
 import com.gojungparkjo.routetracker.data.RoadRepository
+import com.gojungparkjo.routetracker.data.TmapDirectionRepository
 import com.gojungparkjo.routetracker.data.TmapLabelRepository
 import com.gojungparkjo.routetracker.databinding.ActivityMainBinding
 import com.gojungparkjo.routetracker.model.crosswalk.CrossWalkResponse
@@ -50,6 +51,7 @@ class MainActivity : AppCompatActivity(),
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val tmapLabelRepository = TmapLabelRepository()
     private val roadRepository = RoadRepository()
+    private val tmapDirectionRepository = TmapDirectionRepository()
     private lateinit var tts: TTS_Module
     private lateinit var compass: Compass
     private lateinit var stepCounter: StepCounter
@@ -657,6 +659,11 @@ class MainActivity : AppCompatActivity(),
         if (!::naverMap.isInitialized || !naverMap.locationOverlay.isVisible) return null
         return naverMap.locationOverlay.position
     }
+    // 여기서 부터 도보네비
+    private suspend fun getDirection(currentpoisition: LatLng, destinationpoisition: LatLng){
+        val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(currentpoisition.latitude,currentpoisition.longitude,destinationpoisition.latitude, destinationpoisition.longitude)
+    }
+
 
     private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
