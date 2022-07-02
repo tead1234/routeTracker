@@ -18,6 +18,9 @@ object TmapApi {
     val tmapLabelService:TmapLabelService by lazy{
         retrofit.create(TmapLabelService::class.java)
     }
+    val tmapDirectionService: TmapDirectionService by lazy{
+        retrofit.create(TmapDirectionService::class.java)
+    }
 
     fun buildOkHttpClient(): OkHttpClient {
         val interceptor = HttpLoggingInterceptor()
