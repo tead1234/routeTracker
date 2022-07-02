@@ -795,7 +795,9 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun showToast(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        MainScope().launch {
+        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
+        }
     }
 
     companion object {
