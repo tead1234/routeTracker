@@ -8,5 +8,5 @@ import retrofit2.http.Query
 
 interface TmapLabelService {
     @GET("geo/reverseLabel?version=1&format=json&reqCoordType=WGS84GEO&resCoordType=WGS84GEO&reqLevel=17")
-    suspend fun getTrafficIslandInBound(@Query("centerLat") lat:Double,@Query("centerLon") lon:Double,@Query("appKey") key:String): Response<TmapLabelResponse>
+    suspend fun getLabelFromLatLng(@Query("centerLat") lat:Double, @Query("centerLon") lon:Double, @Query("appKey") key:String): Response<TmapLabelResponse>
 }
