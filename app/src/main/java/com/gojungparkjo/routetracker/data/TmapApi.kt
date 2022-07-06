@@ -18,6 +18,9 @@ object TmapApi {
     val tmapLabelService:TmapLabelService by lazy{
         retrofit.create(TmapLabelService::class.java)
     }
+    val tmapPoiService:TmapPoiService by lazy{
+        retrofit.create(TmapPoiService::class.java)
+    }
     val tmapDirectionService: TmapDirectionService by lazy{
         retrofit.create(TmapDirectionService::class.java)
     }

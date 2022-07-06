@@ -32,6 +32,10 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".activity.destinationsetting.DestinationSettingActivity"
+            android:exported="true">
+        </activity>
+
     </application>
 
 </manifest>
