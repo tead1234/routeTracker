@@ -85,6 +85,21 @@ class MainActivity : AppCompatActivity(),
     private var validBound: LatLngBounds? = null
     private var validBoundPolygon: PolygonOverlay? = null
 
+    private val destinationSettingLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
+        when(it.resultCode){
+            DESTINATION_SUCCESS ->{
+                it.data?.let{ //받아온 lat, lng 가지고 처리
+                    val lat = it.getDoubleExtra("lat",0.0)
+                    val lng = it.getDoubleExtra("lng",0.0)
+                    Log.d(TAG, "latlng $lat: $lng")
+                }
+            }
+            DESTINATION_ERROR->{ //에러처리
+
+            }
+        }
+    }
+
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -237,7 +252,7 @@ class MainActivity : AppCompatActivity(),
         }
 
         binding.logoImageView.setOnClickListener {
-            startActivity(Intent(this,DestinationSettingActivity::class.java))
+            destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
         }
 
         binding.trackingButton.setOnClickListener {
@@ -806,6 +821,8 @@ class MainActivity : AppCompatActivity(),
         const val FINISH_DELAY = 3000L
         const val ANNOUNCE_INTERVAL = 5000
         const val REQUESTING_CODE = "100"
+        const val DESTINATION_SUCCESS = 200
+        const val DESTINATION_ERROR = 400
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
         private const val TAG = "MainActivity"
     }
