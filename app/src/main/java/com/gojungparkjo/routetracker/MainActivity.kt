@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity(),
 
     // 키값, 좌표값, 안내멘트
     private var tmapDirectionMap = mutableListOf<Marker>()
+    private var tmapDirectionMapMent = mutableListOf<String>()
 
     private var validBound: LatLngBounds? = null
     private var validBoundPolygon: PolygonOverlay? = null
@@ -94,6 +95,9 @@ class MainActivity : AppCompatActivity(),
                     val lat = it.getDoubleExtra("lat",0.0)
                     val lng = it.getDoubleExtra("lng",0.0)
                     Log.d(TAG, "latlng $lat: $lng")
+                    MainScope().launch {
+                        getCurrentPosition()?.let { it1 -> saveDirection(it1, LatLng(lng,lat)) }
+                    }
                 }
             }
             DESTINATION_ERROR->{ //에러처리
@@ -131,7 +135,6 @@ class MainActivity : AppCompatActivity(),
                         it.locationOverlay.position = coordinate
                         getDirection(coordinate)
                         if (binding.trackingSwitch.isChecked) {
-
                             it.moveCamera(CameraUpdate.scrollTo(coordinate))
                             it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
@@ -708,7 +711,6 @@ class MainActivity : AppCompatActivity(),
                         val linePoints = (feature.geometry.coordinates as List<List<Double>>).map { LatLng(it[1],it[0]) }
                         if(::naverMap.isInitialized){
                             MainScope().launch {
-                                Log.d(TAG, "saveDirection: "+linePoints)
                                 PolylineOverlay(linePoints).map = naverMap
                             }
 
@@ -718,9 +720,9 @@ class MainActivity : AppCompatActivity(),
                             val point = (feature.geometry.coordinates as List<Double>)
                             val latlng = LatLng(point[1],point[0])
                             MainScope().launch {
-                                Log.d(TAG, "saveDirection: "+latlng)
+                                Marker(latlng).apply{captionText = feature.properties.description}.map = naverMap
                                 tmapDirectionMap.add(Marker(latlng))
-                                Marker(latlng).apply { captionText = feature.properties.description }.map = naverMap
+                                tmapDirectionMapMent.add(feature.properties.description)
                             }
                         }
                     }
@@ -731,8 +733,9 @@ class MainActivity : AppCompatActivity(),
     private fun getDirection(position: LatLng){
         CoroutineScope(Dispatchers.IO).launch {
             if (tmapDirectionMap.isEmpty() != true && tmapDirectionMap.get(0).position.distanceTo(position) <5){
-                tts.speakOut(tmapDirectionMap.get(0).captionText)
+                tts.speakOut(tmapDirectionMapMent.get(0))
                 tmapDirectionMap.removeAt(0)
+                tmapDirectionMapMent.removeAt(0)
             }
         }
     }
