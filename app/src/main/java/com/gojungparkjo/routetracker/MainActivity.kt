@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.gojungparkjo.routetracker.ProjUtil.toEPSG5186
 import com.gojungparkjo.routetracker.ProjUtil.toLatLng
+import com.gojungparkjo.routetracker.activity.destinationsetting.DestinationSettingActivity
 import com.gojungparkjo.routetracker.data.RoadRepository
 import com.gojungparkjo.routetracker.data.TmapDirectionRepository
 import com.gojungparkjo.routetracker.data.TmapLabelRepository
@@ -823,16 +824,16 @@ class MainActivity : AppCompatActivity(),
         private const val TAG = "MainActivity"
     }
 
-        // tts part
-        override fun onBackPressed() {
-            val dig = FeedBackDialog(this)
-            dig.show(this)
-            val a = sharedPref.getString("flag", false.toString())
-            flag = a.toBoolean()
-            Toast.makeText(this, a, Toast.LENGTH_SHORT).show()
-            if (!flag) {
-                tts.speakOut("어플을 평가해주세요")
-            }
+    // tts part
+    override fun onBackPressed() {
+        val dig = FeedBackDialog(this)
+        dig.show(this)
+        val a = sharedPref.getString("flag", false.toString())
+        flag = a.toBoolean()
+        Toast.makeText(this, a, Toast.LENGTH_SHORT).show()
+        if (!flag) {
+            tts.speakOut("어플을 평가해주세요")
+        }
 
     }
 }
