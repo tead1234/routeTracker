@@ -2,7 +2,7 @@ package com.gojungparkjo.routetracker.model.tmapdirection
 
 data class Properties(
     val categoryRoadType: Int?,
-    val description: String?,
+    val description: String,
     val direction: String?,
     val distance: Int?,
     val facilityName: String?,

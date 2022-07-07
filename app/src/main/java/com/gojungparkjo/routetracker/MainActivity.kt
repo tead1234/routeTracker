@@ -80,7 +80,10 @@ class MainActivity : AppCompatActivity(),
     private val polylineMap = HashMap<String, PolylineOverlay>()
     private val trafficLightMap = HashMap<String, Marker>()
     private val interSectionMap = HashMap<String, String>()
-    private val tmapDirectionMap = HashMap<String, String>()
+
+    // 키값, 좌표값, 안내멘트
+    private var tmapDirectionMap = mutableListOf<Marker>()
+    private var tmapDirectionMapMent = mutableListOf<String>()
 
     private var validBound: LatLngBounds? = null
     private var validBoundPolygon: PolygonOverlay? = null
@@ -92,6 +95,9 @@ class MainActivity : AppCompatActivity(),
                     val lat = it.getDoubleExtra("lat",0.0)
                     val lng = it.getDoubleExtra("lng",0.0)
                     Log.d(TAG, "latlng $lat: $lng")
+                    MainScope().launch {
+                        getCurrentPosition()?.let { it1 -> saveDirection(it1, LatLng(lng,lat)) }
+                    }
                 }
             }
             DESTINATION_ERROR->{ //에러처리
@@ -122,12 +128,13 @@ class MainActivity : AppCompatActivity(),
                 for (location in locationResult.locations) {
                     naverMap.let {
                         val coordinate = LatLng(location)
-
+                        Log.d("좌표", coordinate.longitude.toString())
+                        Log.d("좌표", coordinate.latitude.toString())
+                        // 이부분에 네이게이션 기능을 추가해야것다. 경로 얻는건 한번만 하고 싶은데??
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
-
+                        getDirection(coordinate)
                         if (binding.trackingSwitch.isChecked) {
-
                             it.moveCamera(CameraUpdate.scrollTo(coordinate))
                             it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
@@ -164,17 +171,6 @@ class MainActivity : AppCompatActivity(),
         setupCompass()
         setupStepCounter()
         smsSttSetup()
-        // 좌표변환해야하네
-
-        CoroutineScope(Dispatchers.IO).launch {
-//            saveDirection(ProjCoordinate(14153070.603113968,4513164.615791613).toLatLng(), ProjCoordinate(14153070.603113968,4513165.615791613).toLatLng())
-            saveDirection(
-                LatLng(126.92365493654832, 37.556770374096615),
-                LatLng(126.92432158129688, 37.55279861528311)
-            )
-
-        }
-
     }
 
 
@@ -336,6 +332,10 @@ class MainActivity : AppCompatActivity(),
         }
         this.naverMap = naverMap
     }
+    // test
+
+
+
 
     private fun findTrafficSignAndCrosswalkInSight(degree: Double) {
         if (!guideMode) return
@@ -695,32 +695,48 @@ class MainActivity : AppCompatActivity(),
         return naverMap.locationOverlay.position
     }
 
-    // 여기서 부터 도보네비
-    private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
-        val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
-            currentpoisition.latitude,
-            currentpoisition.longitude,
-            destinationpoisition.latitude,
-            destinationpoisition.longitude
-        )
-        withContext(Dispatchers.Default) {
-            tmapDirectionResponse?.features?.forEach { feature ->
-                if (tmapDirectionMap.containsKey(
-                        feature.geometry.coordinates.toString().trim()
-                    )
-                ) {
-                    return@forEach
-                } else {
-                    tmapDirectionMap[feature.geometry.coordinates.toString().trim()] =
-                        feature.properties.description.toString()
-                    showToast(feature.properties.description.toString())
+        // 여기서 부터 도보네비
+        private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
+            val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
+                // latlng 객체가 순서가 반대로라 이것만 바꿈
+                currentpoisition.longitude,
+                currentpoisition.latitude,
+                destinationpoisition.latitude,
+                destinationpoisition.longitude
+            )
+            withContext(Dispatchers.Default) {
+                tmapDirectionResponse?.features?.forEach { feature ->
+                    if(feature.geometry.type=="LineString"){
+                        val linePoints = (feature.geometry.coordinates as List<List<Double>>).map { LatLng(it[1],it[0]) }
+                        if(::naverMap.isInitialized){
+                            MainScope().launch {
+                                PolylineOverlay(linePoints).map = naverMap
+                            }
+
+                        }
+                    }else{
+                        if(::naverMap.isInitialized){
+                            val point = (feature.geometry.coordinates as List<Double>)
+                            val latlng = LatLng(point[1],point[0])
+                            MainScope().launch {
+                                Marker(latlng).apply{captionText = feature.properties.description}.map = naverMap
+                                tmapDirectionMap.add(Marker(latlng))
+                                tmapDirectionMapMent.add(feature.properties.description)
+                            }
+                        }
+                    }
+                            }
                 }
             }
-        }
-    }
 
-    private fun getDirection() {
-//        saveDirection(LatLng(14153070.603113968,4513164.615791613), LatLng(14153070.603113968,4513165.615791613))
+    private fun getDirection(position: LatLng){
+        CoroutineScope(Dispatchers.IO).launch {
+            if (tmapDirectionMap.isEmpty() != true && tmapDirectionMap.get(0).position.distanceTo(position) <5){
+                tts.speakOut(tmapDirectionMapMent.get(0))
+                tmapDirectionMap.removeAt(0)
+                tmapDirectionMapMent.removeAt(0)
+            }
+        }
     }
 
 
