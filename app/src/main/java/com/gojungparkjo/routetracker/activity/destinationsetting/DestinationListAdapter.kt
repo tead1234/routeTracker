@@ -14,7 +14,7 @@ class DestinationListAdapter : ListAdapter<Poi, DestinationListAdapter.PoiViewHo
 
     private val TAG = "DestinationListAdapter"
 
-    var onClickNavigateButton: ((Double?, Double?) -> Unit)? = null
+    var onClickNavigateButton: ((Double?, Double?,Poi?) -> Unit)? = null
 
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PoiViewHolder =
@@ -37,11 +37,11 @@ class DestinationListAdapter : ListAdapter<Poi, DestinationListAdapter.PoiViewHo
             }
             binding.navigateButton.setOnClickListener {
                 if (poi.frontLat != null && poi.frontLon != null) {
-                    onClickNavigateButton?.invoke(poi.frontLat.toDouble(), poi.frontLon.toDouble())
+                    onClickNavigateButton?.invoke(poi.frontLat.toDouble(), poi.frontLon.toDouble(),poi)
                 }else if(poi.noorLat != null && poi.noorLon != null){
-                    onClickNavigateButton?.invoke(poi.noorLat.toDouble(), poi.noorLon.toDouble())
+                    onClickNavigateButton?.invoke(poi.noorLat.toDouble(), poi.noorLon.toDouble(),poi)
                 }else{
-                    onClickNavigateButton?.invoke(null,null)
+                    onClickNavigateButton?.invoke(null,null,null)
                 }
             }
         }
