@@ -138,7 +138,6 @@ class MainActivity : AppCompatActivity(),
                             it.moveCamera(CameraUpdate.scrollTo(coordinate))
                             it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
                         }
-//                        Log.d("현재", getCurrentPosition().toString())
                     }
                 }
             }
