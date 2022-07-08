@@ -12,4 +12,5 @@ data class RecentGuideItem(
     val frontLon: String?,
     val noorLat: String?,
     val noorLon: String?,
+    val timeStamp:Long
 )
