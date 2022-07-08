@@ -40,7 +40,7 @@ class DestinationSettingActivity : AppCompatActivity() {
             applicationContext,
             RecentGuideDatabase::class.java,
             "recent-guide-database"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
         recentGuideItemDao = db.recentGuideItemDao()
 
         binding.poiRecyclerView.layoutManager =
@@ -57,12 +57,14 @@ class DestinationSettingActivity : AppCompatActivity() {
                 setResult(MainActivity.DESTINATION_SUCCESS, intent)
                 GlobalScope.launch {
                     recentGuideItemDao.insertPoi(RecentGuideItem(
+                        uid = poi?.id?.toInt()?:0,
                         name = poi?.name,
                         addr = "${poi?.upperAddrName ?: ""} ${poi?.middleAddrName ?: ""} ${poi?.lowerAddrName ?: ""} ${poi?.detailAddrname ?: ""}",
                         frontLat = poi?.frontLat,
                         frontLon = poi?.frontLon,
                         noorLat = poi?.noorLat,
-                        noorLon = poi?.noorLon
+                        noorLon = poi?.noorLon,
+                        System.currentTimeMillis()
                     ))
                 }
                 finish()
@@ -90,7 +92,7 @@ class DestinationSettingActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO + job).launch {
             val recentList = recentGuideItemDao.getTenRecentGuideItem()
-                .map { Poi(it.name, it.addr, it.frontLat, it.frontLon, it.noorLat, it.noorLon) }
+                .map { Poi(it.uid.toString(),it.name, it.addr, it.frontLat, it.frontLon, it.noorLat, it.noorLon) }
             withContext(Dispatchers.Main) {
                 adapter.submitList(recentList)
             }

@@ -10,9 +10,9 @@ interface RecentGuideItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPoi(recentGuideItem: RecentGuideItem)
 
-    @Query("DELETE FROM RecentGuideItem WHERE uid not in (SELECT uid FROM RecentGuideItem LIMIT 10)")
+    @Query("DELETE FROM RecentGuideItem WHERE uid not in (SELECT uid FROM RecentGuideItem ORDER BY timeStamp DESC LIMIT 10)")
     suspend fun deleteIfMoreThanTen()
 
-    @Query("SELECT * FROM RecentGuideItem ORDER BY uid DESC LIMIT 10")
+    @Query("SELECT * FROM RecentGuideItem ORDER BY timeStamp DESC LIMIT 10")
     suspend fun getTenRecentGuideItem():List<RecentGuideItem>
 }
