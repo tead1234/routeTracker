@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity(),
     private lateinit var stt: Stt
     private lateinit var sharedPref: SharedPreferences
     private lateinit var naverMap: NaverMap
-
+    private  var Azimuth: Float = 0.0f
     lateinit var binding: ActivityMainBinding
 
     private var flag = false
@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity(),
                         // 이부분에 네이게이션 기능을 추가해야것다. 경로 얻는건 한번만 하고 싶은데??
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
-                        getDirection(coordinate)
+                        getDirection(coordinate, Azimuth)
                         if (binding.trackingSwitch.isChecked) {
                             it.moveCamera(CameraUpdate.scrollTo(coordinate))
                             it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
@@ -217,11 +217,12 @@ class MainActivity : AppCompatActivity(),
         msp.show(this)
     }
 
-
+// azimuth 내 각도 말하는거 0부터 360
     private fun setupCompass() {
         compass = Compass(this)
         compass.setListener(object : Compass.CompassListener {
             override fun onNewAzimuth(azimuth: Float) {
+                Azimuth = azimuth
                 binding.compassTextView.text = azimuth.toInt().toString()
                 if (::naverMap.isInitialized) naverMap.locationOverlay.bearing = azimuth
                 if (System.currentTimeMillis() - lastAnnounceTime > ANNOUNCE_INTERVAL) {
@@ -344,21 +345,6 @@ class MainActivity : AppCompatActivity(),
             if (findJob.isActive) return
             findJob = MainScope().launch {
                 naverMap.let { map ->
-//                    trafficLightMap.forEach { (_, trafficLight) ->
-//                        val temp = atan2(
-//                            trafficLight.position.longitude - map.locationOverlay.position.longitude,
-//                            trafficLight.position.latitude - map.locationOverlay.position.latitude
-//                        ).toDegree()
-//                        val diff = temp.toInt() - degree.toInt()
-//                        val dist = trafficLight.position.distanceTo(map.locationOverlay.position)
-//                        trafficLight.captionText = "diff: $diff"
-//                        trafficLight.iconTintColor =
-//                            if (diff in -20..20 && dist < 10) Color.BLACK else Color.GREEN
-//                        trafficLight.icon = MarkerIcons.BLACK
-//                        if (diff in -20..20 && dist < 10 && tts.tts.isSpeaking.not()) {
-//                            tts.speakOut(trafficLight.tag.toString())
-//                        }
-//                    }
                     var nearestEntryPointDistanceInSight = Double.MAX_VALUE
                     var nearestEntryPointIntersectionCode = ""
                     var nearestEntryPointCrossWalkCode = ""
@@ -729,10 +715,35 @@ class MainActivity : AppCompatActivity(),
                 }
             }
 
-    private fun getDirection(position: LatLng){
+    private fun getDirection(position: LatLng , azimuth: Float){
+//        val crossWalkAngle =
+//            if (firstPointDistance < secondPointDistance) atan2(
+//                polygon.second.second.longitude - polygon.second.first.longitude,
+//                polygon.second.second.latitude - polygon.second.first.latitude
+//            ).toDegree() else atan2(
+//                polygon.second.first.longitude - polygon.second.second.longitude,
+//                polygon.second.first.latitude - polygon.second.second.latitude
+//            ).toDegree()
+//        // 횡단보도의 진행방향과 사용자의 방향 차이가 -20~20도 이내가 아니면 스킵
+//        if (crossWalkAngle.toInt() - degree.toInt() !in -20..20) return@forEach
         CoroutineScope(Dispatchers.IO).launch {
             if (tmapDirectionMap.isEmpty() != true && tmapDirectionMap.get(0).position.distanceTo(position) <5){
-                tts.speakOut(tmapDirectionMapMent.get(0))
+                val markerangle = atan2(tmapDirectionMap.get(1).position.longitude - tmapDirectionMap.get(0).position.longitude,
+                    tmapDirectionMap.get(1).position.latitude - tmapDirectionMap.get(0).position.latitude
+                    ).toDegree()
+                Log.d(TAG,  "마커위치"+markerangle.toString())
+                Log.d(TAG, "내가 보는 방향"+azimuth.toString())
+                if(markerangle.toInt() - azimuth.toInt() > 5) {
+                    tts.speakOut("오른쪽 방향으로 회전합니다."+tmapDirectionMapMent.get(0))
+                }
+                else if(markerangle.toInt() - azimuth.toInt() < -5){
+                    tts.speakOut("왼쪽방향으로 회전합니다." + tmapDirectionMapMent.get(0))
+                }else{
+                    tts.speakOut("앞으로 계속 직진합니다."+tmapDirectionMapMent.get(0))
+                }
+
+                // 내가 보고있는 현제 각도를 가져와서 함 빼보자
+//                tts.speakOut(tmapDirectionMapMent.get(0))
                 tmapDirectionMap.removeAt(0)
                 tmapDirectionMapMent.removeAt(0)
             }
