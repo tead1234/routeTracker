@@ -35,16 +35,7 @@ class DestinationSettingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityDestinationSettingBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        db = Room.databaseBuilder(
-            applicationContext,
-            RecentGuideDatabase::class.java,
-            "recent-guide-database"
-        ).fallbackToDestructiveMigration().build()
-        recentGuideItemDao = db.recentGuideItemDao()
-
-        binding.poiRecyclerView.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        binding.poiRecyclerView.layoutManager = LinearLayoutManager(this,LinearLayoutManager.VERTICAL,false)
         binding.poiRecyclerView.adapter = DestinationListAdapter().also { adapter = it }
         adapter.onClickNavigateButton = { lat, lng, poi ->
             if (lat == null && lng == null) {
