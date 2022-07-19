@@ -70,4 +70,6 @@ data class Poi(
     val upperBizName: String?,
     @SerializedName("zipCode")
     val zipCode: String?
-)
+){
+    constructor(id:String?,name:String?,addr:String?,frontLat: String?,frontLon: String?,noorLat: String?,noorLon: String?):this(null,null,null,null,null,null,null,null,null,frontLat,frontLon,null,id,null,null,null,null,null,name,null,null,noorLat,noorLon,null,null,null,null,null,null,null,addr,null,null)
+}

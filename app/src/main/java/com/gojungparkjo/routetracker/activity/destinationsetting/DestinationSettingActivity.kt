@@ -7,9 +7,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
+import androidx.room.Room
 import com.gojungparkjo.routetracker.MainActivity
 import com.gojungparkjo.routetracker.data.TmapPoiRepository
+import com.gojungparkjo.routetracker.data.room.RecentGuideDatabase
+import com.gojungparkjo.routetracker.data.room.RecentGuideItem
+import com.gojungparkjo.routetracker.data.room.RecentGuideItemDao
 import com.gojungparkjo.routetracker.databinding.ActivityDestinationSettingBinding
+import com.gojungparkjo.routetracker.model.tmappoi.Poi
 import kotlinx.coroutines.*
 
 class DestinationSettingActivity : AppCompatActivity() {
@@ -23,21 +28,36 @@ class DestinationSettingActivity : AppCompatActivity() {
 
     private val job = Job()
 
+    lateinit var db: RecentGuideDatabase
+    lateinit var recentGuideItemDao: RecentGuideItemDao
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDestinationSettingBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.poiRecyclerView.layoutManager = LinearLayoutManager(this,LinearLayoutManager.VERTICAL,false)
         binding.poiRecyclerView.adapter = DestinationListAdapter().also { adapter = it }
-        adapter.onClickNavigateButton = { lat,lng ->
-            if(lat==null&&lng==null){
+        adapter.onClickNavigateButton = { lat, lng, poi ->
+            if (lat == null && lng == null) {
                 setResult(MainActivity.DESTINATION_ERROR)
-            }else{
-                val intent = Intent(this,MainActivity::class.java).apply {
-                    putExtra("lat",lat)
-                    putExtra("lng",lng)
+            } else {
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    putExtra("lat", lat)
+                    putExtra("lng", lng)
                 }
-                setResult(MainActivity.DESTINATION_SUCCESS,intent)
+                setResult(MainActivity.DESTINATION_SUCCESS, intent)
+                GlobalScope.launch {
+                    recentGuideItemDao.insertPoi(RecentGuideItem(
+                        uid = poi?.id?.toInt()?:0,
+                        name = poi?.name,
+                        addr = "${poi?.upperAddrName ?: ""} ${poi?.middleAddrName ?: ""} ${poi?.lowerAddrName ?: ""} ${poi?.detailAddrname ?: ""}",
+                        frontLat = poi?.frontLat,
+                        frontLon = poi?.frontLon,
+                        noorLat = poi?.noorLat,
+                        noorLon = poi?.noorLon,
+                        System.currentTimeMillis()
+                    ))
+                }
                 finish()
             }
         }
@@ -47,7 +67,7 @@ class DestinationSettingActivity : AppCompatActivity() {
                 Log.d(TAG, "onQueryTextSubmit: ")
                 CoroutineScope(Dispatchers.IO + job).launch {
                     val poiList = tmapPoiRepository.getPoiQueryResult(query ?: "")
-                    withContext(Dispatchers.Main){
+                    withContext(Dispatchers.Main) {
                         adapter.submitList(poiList)
                     }
                 }
@@ -59,6 +79,16 @@ class DestinationSettingActivity : AppCompatActivity() {
                 return true
             }
         })
+
+
+        CoroutineScope(Dispatchers.IO + job).launch {
+            val recentList = recentGuideItemDao.getTenRecentGuideItem()
+                .map { Poi(it.uid.toString(),it.name, it.addr, it.frontLat, it.frontLon, it.noorLat, it.noorLon) }
+            withContext(Dispatchers.Main) {
+                adapter.submitList(recentList)
+            }
+        }
+
 
     }
 
