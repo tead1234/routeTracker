@@ -21,21 +21,30 @@ class DestinationSettingActivity : AppCompatActivity() {
 
     private val TAG = "DestinationSettingActivity"
 
-    lateinit var binding: ActivityDestinationSettingBinding
-    lateinit var adapter: DestinationListAdapter
+    private lateinit var binding: ActivityDestinationSettingBinding
+    private lateinit var adapter: DestinationListAdapter
 
     private val tmapPoiRepository = TmapPoiRepository()
 
     private val job = Job()
 
-    lateinit var db: RecentGuideDatabase
-    lateinit var recentGuideItemDao: RecentGuideItemDao
+    private lateinit var db: RecentGuideDatabase
+    private lateinit var recentGuideItemDao: RecentGuideItemDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDestinationSettingBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.poiRecyclerView.layoutManager = LinearLayoutManager(this,LinearLayoutManager.VERTICAL,false)
+
+        db = Room.databaseBuilder(
+            applicationContext,
+            RecentGuideDatabase::class.java,
+            "recent-guide-database"
+        ).fallbackToDestructiveMigration().build()
+        recentGuideItemDao = db.recentGuideItemDao()
+
+        binding.poiRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         binding.poiRecyclerView.adapter = DestinationListAdapter().also { adapter = it }
         adapter.onClickNavigateButton = { lat, lng, poi ->
             if (lat == null && lng == null) {
