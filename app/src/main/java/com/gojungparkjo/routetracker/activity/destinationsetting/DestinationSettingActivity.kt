@@ -27,7 +27,6 @@ class DestinationSettingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityDestinationSettingBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         binding.poiRecyclerView.layoutManager = LinearLayoutManager(this,LinearLayoutManager.VERTICAL,false)
         binding.poiRecyclerView.adapter = DestinationListAdapter().also { adapter = it }
         adapter.onClickNavigateButton = { lat,lng ->
