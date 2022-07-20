@@ -64,8 +64,9 @@ class MainActivity : AppCompatActivity(),
     private lateinit var naverMap: NaverMap
     private  var Azimuth: Float = 0.0f
     private var savePolygonOverlay=  PolylineOverlay()
+    private var saveMarker = Marker()
     lateinit var binding: ActivityMainBinding
-
+    var flagForDirectionMode = false
     private var flag = false
     private var requesting = false
     private var guideMode = false
@@ -74,7 +75,7 @@ class MainActivity : AppCompatActivity(),
     private var fetchAndMakeJob: Job = Job().apply { complete() }
     private var addShapeJob: Job = Job()
     private var findJob: Job = Job()
-
+    private var repeatableJob: Job = Job()
     private val polygonMap =
         HashMap<String, Triple<PolygonOverlay, Pair<LatLng, LatLng>, Pair<String, String>>>()
     private val pedestrianRoadMap = HashMap<String, PolygonOverlay>()
@@ -101,7 +102,8 @@ class MainActivity : AppCompatActivity(),
                             tmapDirectionMap.clear()
                             tmapDirectionMapMent.clear()
                         }
-                        getCurrentPosition()?.let { it1 -> saveDirection(it1, LatLng(lng,lat)) }
+                        getCurrentPosition()?.let { it1 -> saveDirection(it1, LatLng(lng,lat))}
+                        flagForDirectionMode = true
                     }
                 }
             }
@@ -138,8 +140,8 @@ class MainActivity : AppCompatActivity(),
                         Log.d("좌표", coordinate.latitude.toString())
                         it.locationOverlay.isVisible = true
                         it.locationOverlay.position = coordinate
-                        getDirection(coordinate, Azimuth)
-                        adjustGPS(coordinate, Azimuth)
+//                        getDirection(coordinate, Azimuth)
+//                        adjustGPS(coordinate, Azimuth)
                         if (binding.trackingSwitch.isChecked) {
                             it.moveCamera(CameraUpdate.scrollTo(coordinate))
 //                            it.moveCamera(CameraUpdate.zoomTo(18.0))   //처음 확대레벨 설정
@@ -176,6 +178,7 @@ class MainActivity : AppCompatActivity(),
         setupCompass()
         setupStepCounter()
         smsSttSetup()
+        walkSupport()
     }
 
 
@@ -686,41 +689,56 @@ class MainActivity : AppCompatActivity(),
         return naverMap.locationOverlay.position
     }
 
+    private fun walkSupport() {
+        if (flagForDirectionMode == false){
+            repeatableJob.cancel()
+        }
+        repeatableJob = MainScope().launch {
+            while (isActive) {
+                delay(10000)
+                getCurrentPosition()?.let { getDirection(it, Azimuth) }
+                getCurrentPosition()?.let { adjustGPS(it, Azimuth) }
+            }
+        }
+        repeatableJob.start()
+    }
         // 여기서 부터 도보네비
-        private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
+    private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
             savePolygonOverlay.map = null
-            val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
-                // latlng 객체가 순서가 반대로라 이것만 바꿈
-                currentpoisition.longitude,
-                currentpoisition.latitude,
-                destinationpoisition.latitude,
-                destinationpoisition.longitude
-            )
-            withContext(Dispatchers.Default) {
-                tmapDirectionResponse?.features?.forEach { feature ->
-                    if(feature.geometry.type=="LineString"){
-                        val linePoints = (feature.geometry.coordinates as List<List<Double>>).map { LatLng(it[1],it[0]) }
-                        if(::naverMap.isInitialized){
-                            MainScope().launch {
-                                savePolygonOverlay = PolylineOverlay(linePoints)
-                                savePolygonOverlay.map = naverMap
-                            }
-
+            saveMarker.map = null
+        val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
+            // latlng 객체가 순서가 반대로라 이것만 바꿈
+            currentpoisition.longitude,
+            currentpoisition.latitude,
+            destinationpoisition.latitude,
+            destinationpoisition.longitude
+        )
+        withContext(Dispatchers.Default) {
+            tmapDirectionResponse?.features?.forEach { feature ->
+                if(feature.geometry.type=="LineString"){
+                    val linePoints = (feature.geometry.coordinates as List<List<Double>>).map { LatLng(it[1],it[0]) }
+                    if(::naverMap.isInitialized){
+                        MainScope().launch {
+                            savePolygonOverlay = PolylineOverlay(linePoints)
+                            savePolygonOverlay.map = naverMap
                         }
-                    }else{
-                        if(::naverMap.isInitialized){
-                            val point = (feature.geometry.coordinates as List<Double>)
-                            val latlng = LatLng(point[1],point[0])
-                            MainScope().launch {
-                                Marker(latlng).apply{captionText = feature.properties.description}.map = naverMap
-                                tmapDirectionMap.add(Marker(latlng))
-                                tmapDirectionMapMent.add(feature.properties.description)
-                            }
+
+                    }
+                }else{
+                    if(::naverMap.isInitialized){
+                        val point = (feature.geometry.coordinates as List<Double>)
+                        val latlng = LatLng(point[1],point[0])
+                        MainScope().launch {
+                            saveMarker = Marker(latlng)
+                            saveMarker.apply{captionText = feature.properties.description}.map = naverMap
+                            tmapDirectionMap.add(Marker(latlng))
+                            tmapDirectionMapMent.add(feature.properties.description)
                         }
                     }
-                            }
                 }
+                        }
             }
+        }
     var key = 0
     private fun adjustGPS(position: LatLng , azimuth: Float){
         CoroutineScope(Dispatchers.IO).launch {
@@ -730,10 +748,10 @@ class MainActivity : AppCompatActivity(),
                     tmapDirectionMap.get(0).position.longitude - position.longitude,
                     tmapDirectionMap.get(0).position.latitude - position.longitude
                 ).toDegree()
-                if (markerangle2.toInt() - azimuth.toInt() > 3 && key != 1) {
+                if (markerangle2.toInt() - azimuth.toInt() > 5 && key != 1) {
                     key = 1
                     tts.speakOut("GPS조정 왼쪽으로 3걸음 이동후 기존방향으로 진행하세요")
-                } else if (markerangle2.toInt() - azimuth.toInt() < -3 && key != 2) {
+                } else if (markerangle2.toInt() - azimuth.toInt() < -5 && key != 2) {
                     key = 2
                     tts.speakOut("GPS조정 오른쪽으로 3걸음 이동후 기존방향으로 진행하세요")
                 }
@@ -741,23 +759,11 @@ class MainActivity : AppCompatActivity(),
         }
     }
     private fun getDirection(position: LatLng , azimuth: Float){
-        CoroutineScope(Dispatchers.IO).launch {
-            // 나의 위치와 내 위치 근처 string의 거리를 가져와서 좌 우로 이동을 유도
-            if(tmapDirectionMap.isEmpty() != true){
-                val markerangle = atan2(tmapDirectionMap.get(1).position.longitude - tmapDirectionMap.get(0).position.longitude,
-                    tmapDirectionMap.get(1).position.latitude - tmapDirectionMap.get(0).position.longitude
-                ).toDegree()
-                if(markerangle.toInt() - azimuth.toInt() > 20){
-                    tts.speakOut("오른쪽으로 20도 방향을 틀어주세요")
-                }else if(markerangle.toInt() - azimuth.toInt() < -20) {
-                    tts.speakOut("왼쪽으로 20도 방향을 틀어주세요")
-                }else if(markerangle.toInt() - azimuth.toInt() <= 20  && markerangle.toInt() - azimuth.toInt() >= -20){
-
-                }
-//                }else if(key != 3 && markerangle2.toInt() - azimuth.toInt() > -2 && markerangle2.toInt() - azimuth.toInt() < 2   ){
-//                    key = 3
-//                    tts.speakOut("그 방향으로 계속 이동해주세요")
-//                }
+        MainScope().launch {
+            if(tmapDirectionMap.isEmpty() == true){
+                savePolygonOverlay.map = null
+                saveMarker.map =null
+                flagForDirectionMode = false
             }
             if (tmapDirectionMap.isEmpty() != true && tmapDirectionMap.get(0).position.distanceTo(position) <7){
                 tts.speakOut(tmapDirectionMapMent.get(0))
