@@ -704,8 +704,12 @@ class MainActivity : AppCompatActivity(),
     }
         // 여기서 부터 도보네비
     private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
+            // 맵지우기 코드인데 안됨
             savePolygonOverlay.map = null
             saveMarker.map = null
+            Log.d(
+                TAG, "저장된 맵"+savePolygonOverlay.map.toString() + saveMarker.map.toString()
+            )
         val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
             // latlng 객체가 순서가 반대로라 이것만 바꿈
             currentpoisition.longitude,
@@ -761,6 +765,7 @@ class MainActivity : AppCompatActivity(),
     private fun getDirection(position: LatLng , azimuth: Float){
         MainScope().launch {
             if(tmapDirectionMap.isEmpty() == true){
+                // 맵지우기 코드인데 안됨
                 savePolygonOverlay.map = null
                 saveMarker.map =null
                 flagForDirectionMode = false
