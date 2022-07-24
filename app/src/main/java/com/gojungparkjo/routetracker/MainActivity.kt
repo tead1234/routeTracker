@@ -697,7 +697,7 @@ class MainActivity : AppCompatActivity(),
             while (isActive) {
                 delay(8000)
                 getCurrentPosition()?.let { getDirection(it, Azimuth) }
-                getCurrentPosition()?.let { adjustGPS(it) }
+//                getCurrentPosition()?.let { adjustGPS(it) }
             }
         }
         repeatableJob.start()
@@ -794,7 +794,6 @@ class MainActivity : AppCompatActivity(),
                 tmapDirectionMap.removeAt(0)
                 tmapDirectionMapMent.removeAt(0)
                 adjustGPS(position)
-
             }
         }
     }
