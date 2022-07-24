@@ -65,15 +65,19 @@
                     android:layout_width="0dp"
                     android:orientation="horizontal"
                     android:layout_height="wrap_content">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="걸음 수 : "
-                        />
+                        android:textSize="23sp"
+                        android:textColor="@color/black" />
 
                     <TextView
                         android:id="@+id/trackingSteps"
                         tools:text="3777"
+                        android:textSize="23sp"
+                        android:textColor="@color/black"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         />
@@ -86,9 +90,15 @@
                     android:gravity="end"
                     android:layout_height="wrap_content">
                     <TextView
+                        android:id="@+id/destination_text_view"
+                        android:maxLines="1"
+                        android:ellipsize="marquee"
+                        android:marqueeRepeatLimit="marquee_forever"
+                        android:textSize="23sp"
+                        android:textColor="@color/black"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="경로 안내 중.. 목적지 :"
+                        android:text="횡단보도 안내 중"
                         />
 
                 </LinearLayout>
