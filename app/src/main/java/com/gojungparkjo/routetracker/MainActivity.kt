@@ -256,22 +256,14 @@ class MainActivity : AppCompatActivity(),
             naverMap.locationOverlay.position = naverMap.cameraPosition.target
         }
 
-        binding.logoImageView.setOnClickListener {
-            destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
-        }
-
         binding.routeButton.setOnClickListener {
-            if (guideMode) {
-                guideMode = false
+            if (flagForDirectionMode) {
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80008000"))
-                binding.routeButton.text = "안내 시작"
-                showToast("안내를 종료합니다.")
+                binding.routeButton.text = "목적지 설정"
             } else {
-                checkPermissions()
+                destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80FF0000"))
-                binding.routeButton.text = "안내 종료"
-                showToast("안내를 시작합니다.")
-                guideMode = true
+                binding.routeButton.text = "경로 안내 종료"
             }
         }
         // 음향신호기 고장 신고/설치 요청

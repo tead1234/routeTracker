@@ -29,6 +29,33 @@
             android:orientation="vertical">
 
             <LinearLayout
+                android:background="@color/white"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/compass_text_view"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    android:background="@drawable/rounded_gray_transparent_bg"
+                    android:textAlignment="center"
+                    />
+
+                <ImageView
+                    android:id="@+id/logo_image_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/logo"
+                    android:layout_marginRight="30dp"
+                    />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:background="@color/white"
                 android:layout_width="match_parent"
                 android:orientation="horizontal"
                 android:layout_height="wrap_content">
@@ -66,39 +93,7 @@
 
                 </LinearLayout>
 
-
             </LinearLayout>
-
-
-            <LinearLayout
-                android:background="@color/white"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="30dp"
-                    android:layout_height="wrap_content"
-                    android:id="@+id/compass_text_view"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    android:background="@drawable/rounded_gray_transparent_bg"
-                    android:textAlignment="center"
-                    />
-
-                <ImageView
-                    android:id="@+id/logo_image_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:src="@drawable/logo"
-                    android:layout_marginRight="30dp"
-                    />
-
-            </LinearLayout>
-
-
-
-
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -137,13 +132,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="300dp"
                     android:background="#80008000"
-                    android:text="경로 설정"
+                    android:text="목적지 설정"
                     android:textSize="40dp" />
 
 
 
                 <LinearLayout
-
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="horizontal"
