@@ -53,6 +53,7 @@ class DestinationSettingActivity : AppCompatActivity() {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     putExtra("lat", lat)
                     putExtra("lng", lng)
+                    putExtra("name",poi?.name?:"")
                 }
                 setResult(MainActivity.DESTINATION_SUCCESS, intent)
                 GlobalScope.launch {

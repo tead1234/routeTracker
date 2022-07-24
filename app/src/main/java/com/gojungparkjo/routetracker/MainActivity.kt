@@ -96,9 +96,10 @@ class MainActivity : AppCompatActivity(),
                 it.data?.let{ //받아온 lat, lng 가지고 처리
                     val lat = it.getDoubleExtra("lat",0.0)
                     val lng = it.getDoubleExtra("lng",0.0)
-                    Log.d(TAG, "latlng $lat: $lng")
+                    val name = it.getStringExtra("name")
+                    binding.destinationTextView.text = "목적지 : ${it.getStringExtra(name)}"
                     MainScope().launch {
-                        if (tmapDirectionMap.isEmpty() == false){
+                        if (!tmapDirectionMap.isEmpty()){
                             tmapDirectionMap.clear()
                             tmapDirectionMapMent.clear()
                         }
@@ -260,6 +261,7 @@ class MainActivity : AppCompatActivity(),
             if (flagForDirectionMode) {
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.routeButton.text = "목적지 설정"
+                binding.destinationTextView.text = "횡단보도 안내 중"
             } else {
                 destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80FF0000"))
