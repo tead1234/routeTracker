@@ -21,15 +21,15 @@ class DestinationSettingActivity : AppCompatActivity() {
 
     private val TAG = "DestinationSettingActivity"
 
-    lateinit var binding: ActivityDestinationSettingBinding
-    lateinit var adapter: DestinationListAdapter
+    private lateinit var binding: ActivityDestinationSettingBinding
+    private lateinit var adapter: DestinationListAdapter
 
     private val tmapPoiRepository = TmapPoiRepository()
 
     private val job = Job()
 
-    lateinit var db: RecentGuideDatabase
-    lateinit var recentGuideItemDao: RecentGuideItemDao
+    private lateinit var db: RecentGuideDatabase
+    private lateinit var recentGuideItemDao: RecentGuideItemDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
