@@ -63,8 +63,8 @@ class MainActivity : AppCompatActivity(),
     private lateinit var sharedPref: SharedPreferences
     private lateinit var naverMap: NaverMap
     private  var Azimuth: Float = 0.0f
-    private var savePolygonOverlay=  PolylineOverlay()
-    private var saveMarker = Marker()
+    private var savePolygonOverlay =  mutableListOf<PolylineOverlay>()
+    private var saveMarker = mutableListOf<Marker>()
     lateinit var binding: ActivityMainBinding
     var flagForDirectionMode = false
     private var flag = false
@@ -697,7 +697,7 @@ class MainActivity : AppCompatActivity(),
             while (isActive) {
                 delay(10000)
                 getCurrentPosition()?.let { getDirection(it, Azimuth) }
-                getCurrentPosition()?.let { adjustGPS(it, Azimuth) }
+//                getCurrentPosition()?.let { adjustGPS(it, Azimuth) }
             }
         }
         repeatableJob.start()
@@ -705,11 +705,16 @@ class MainActivity : AppCompatActivity(),
         // 여기서 부터 도보네비
     private suspend fun saveDirection(currentpoisition: LatLng, destinationpoisition: LatLng) {
             // 맵지우기 코드인데 안됨
-            savePolygonOverlay.map = null
-            saveMarker.map = null
-            Log.d(
-                TAG, "저장된 맵"+savePolygonOverlay.map.toString() + saveMarker.map.toString()
-            )
+            MainScope().launch {
+                savePolygonOverlay.forEach { it.map = null }
+                savePolygonOverlay.clear()
+                saveMarker.forEach { it.map =null }
+                saveMarker.clear()
+            }
+
+//            Log.d(
+//                TAG, "저장된 맵"+ saveMarker.map.toString()
+//            )
         val tmapDirectionResponse = tmapDirectionRepository.getDirectionFromDepToDes(
             // latlng 객체가 순서가 반대로라 이것만 바꿈
             currentpoisition.longitude,
@@ -717,14 +722,16 @@ class MainActivity : AppCompatActivity(),
             destinationpoisition.latitude,
             destinationpoisition.longitude
         )
+            // 주소값만 복사된 카피라 다 지워지지가 않네 전체 복사해야됨
         withContext(Dispatchers.Default) {
             tmapDirectionResponse?.features?.forEach { feature ->
                 if(feature.geometry.type=="LineString"){
                     val linePoints = (feature.geometry.coordinates as List<List<Double>>).map { LatLng(it[1],it[0]) }
                     if(::naverMap.isInitialized){
                         MainScope().launch {
-                            savePolygonOverlay = PolylineOverlay(linePoints)
-                            savePolygonOverlay.map = naverMap
+                            PolylineOverlay(linePoints).also {
+                                savePolygonOverlay.add(it)
+                            }.map = naverMap
                         }
 
                     }
@@ -733,32 +740,40 @@ class MainActivity : AppCompatActivity(),
                         val point = (feature.geometry.coordinates as List<Double>)
                         val latlng = LatLng(point[1],point[0])
                         MainScope().launch {
-                            saveMarker = Marker(latlng)
-                            saveMarker.apply{captionText = feature.properties.description}.map = naverMap
+                            Marker(latlng).also {
+                                saveMarker.add(it)
+                            }.apply{captionText = feature.properties.description}.map = naverMap
                             tmapDirectionMap.add(Marker(latlng))
                             tmapDirectionMapMent.add(feature.properties.description)
                         }
                     }
                 }
-                        }
+            }
             }
         }
     var key = 0
-    private fun adjustGPS(position: LatLng , azimuth: Float){
+    // tts 씹힘현상
+    private fun adjustGPS(position: LatLng){
         CoroutineScope(Dispatchers.IO).launch {
             // 나의 위치와 내 위치 근처 string의 거리를 가져와서 좌 우로 이동을 유도
             if (tmapDirectionMap.isEmpty() != true) {
                 val markerangle2 = atan2(
                     tmapDirectionMap.get(0).position.longitude - position.longitude,
-                    tmapDirectionMap.get(0).position.latitude - position.longitude
-                ).toDegree()
-                if (markerangle2.toInt() - azimuth.toInt() > 5 && key != 1) {
-                    key = 1
-                    tts.speakOut("GPS조정 왼쪽으로 3걸음 이동후 기존방향으로 진행하세요")
-                } else if (markerangle2.toInt() - azimuth.toInt() < -5 && key != 2) {
-                    key = 2
-                    tts.speakOut("GPS조정 오른쪽으로 3걸음 이동후 기존방향으로 진행하세요")
+                    tmapDirectionMap.get(0).position.latitude - position.latitude
+                ).toDegree2()
+                Log.d(TAG, "오브젝트이 방향"+markerangle2.toString())
+                if (markerangle2 < 0){
+                    tts.speakOut("좌회전하세요")
+                }else{
+                    tts.speakOut("우회전하세요")
                 }
+//                if (markerangle2.toInt() - azimuth.toInt() > 5 && key != 1) {
+//                    key = 1
+//                    tts.speakOut("GPS조정 왼쪽으로 3걸음 이동후 기존방향으로 진행하세요")
+//                } else if (markerangle2.toInt() - azimuth.toInt() < -5 && key != 2) {
+//                    key = 2
+//                    tts.speakOut("GPS조정 오른쪽으로 3걸음 이동후 기존방향으로 진행하세요")
+//                }
             }
         }
     }
@@ -766,14 +781,18 @@ class MainActivity : AppCompatActivity(),
         MainScope().launch {
             if(tmapDirectionMap.isEmpty() == true){
                 // 맵지우기 코드인데 안됨
-                savePolygonOverlay.map = null
-                saveMarker.map =null
+                saveMarker.forEach { it.map = null }
+                saveMarker.clear()
                 flagForDirectionMode = false
             }
             if (tmapDirectionMap.isEmpty() != true && tmapDirectionMap.get(0).position.distanceTo(position) <7){
+                // 나하고 다음 목적지와의 방향을 계산하고  그 방향이 180을 넘으면 왼쪽, 아니면 오른쪽
+                showToast(tmapDirectionMapMent.get(0))
                 tts.speakOut(tmapDirectionMapMent.get(0))
                 tmapDirectionMap.removeAt(0)
                 tmapDirectionMapMent.removeAt(0)
+//                adjustGPS(position)
+
             }
         }
     }
