@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity(),
                     val lat = it.getDoubleExtra("lat",0.0)
                     val lng = it.getDoubleExtra("lng",0.0)
                     val name = it.getStringExtra("name")
-                    binding.destinationTextView.text = "목적지 : ${it.getStringExtra(name)}"
+                    binding.destinationTextView.text = "목적지 : ${name}"
                     MainScope().launch {
                         if (!tmapDirectionMap.isEmpty()){
                             tmapDirectionMap.clear()
@@ -262,6 +262,7 @@ class MainActivity : AppCompatActivity(),
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80008000"))
                 binding.routeButton.text = "목적지 설정"
                 binding.destinationTextView.text = "횡단보도 안내 중"
+                flagForDirectionMode = false
             } else {
                 destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
                 binding.routeButton.setBackgroundColor(Color.parseColor("#80FF0000"))
