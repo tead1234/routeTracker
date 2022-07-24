@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity(),
 
     private var flag = false
     private var requesting = false
-    private var guideMode = false
+    private var guideMode = true
     var lastAnnounceTime = 0L
 
     private var fetchAndMakeJob: Job = Job().apply { complete() }
@@ -252,16 +252,16 @@ class MainActivity : AppCompatActivity(),
             destinationSettingLauncher.launch(Intent(this,DestinationSettingActivity::class.java))
         }
 
-        binding.trackingButton.setOnClickListener {
+        binding.routeButton.setOnClickListener {
             if (guideMode) {
                 guideMode = false
-                binding.trackingButton.setBackgroundColor(Color.parseColor("#80008000"))
-                binding.trackingButton.text = "안내 시작"
+                binding.routeButton.setBackgroundColor(Color.parseColor("#80008000"))
+                binding.routeButton.text = "안내 시작"
                 showToast("안내를 종료합니다.")
             } else {
                 checkPermissions()
-                binding.trackingButton.setBackgroundColor(Color.parseColor("#80FF0000"))
-                binding.trackingButton.text = "안내 종료"
+                binding.routeButton.setBackgroundColor(Color.parseColor("#80FF0000"))
+                binding.routeButton.text = "안내 종료"
                 showToast("안내를 시작합니다.")
                 guideMode = true
             }
@@ -296,13 +296,13 @@ class MainActivity : AppCompatActivity(),
             if (!mapMode) {
                 binding.addButton.toInvisible()
                 binding.fixButton.toInvisible()
-                binding.trackingButton.toInvisible()
+                binding.routeButton.toInvisible()
                 binding.mapButton.text = "버튼 모드"
                 mapMode = true
             } else {
                 binding.addButton.toVisible()
                 binding.fixButton.toVisible()
-                binding.trackingButton.toVisible()
+                binding.routeButton.toVisible()
                 binding.mapButton.text = "지도 모드"
                 mapMode = false
             }
