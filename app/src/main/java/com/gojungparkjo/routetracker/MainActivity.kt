@@ -695,9 +695,9 @@ class MainActivity : AppCompatActivity(),
         }
         repeatableJob = MainScope().launch {
             while (isActive) {
-                delay(10000)
+                delay(8000)
                 getCurrentPosition()?.let { getDirection(it, Azimuth) }
-//                getCurrentPosition()?.let { adjustGPS(it, Azimuth) }
+                getCurrentPosition()?.let { adjustGPS(it) }
             }
         }
         repeatableJob.start()
@@ -742,7 +742,7 @@ class MainActivity : AppCompatActivity(),
                         MainScope().launch {
                             Marker(latlng).also {
                                 saveMarker.add(it)
-                            }.apply{captionText = feature.properties.description}.map = naverMap
+                            }.apply{captionText = feature.properties.description; iconTintColor=Color.BLUE}.map = naverMap
                             tmapDirectionMap.add(Marker(latlng))
                             tmapDirectionMapMent.add(feature.properties.description)
                         }
@@ -762,9 +762,9 @@ class MainActivity : AppCompatActivity(),
                     tmapDirectionMap.get(0).position.latitude - position.latitude
                 ).toDegree2()
                 Log.d(TAG, "오브젝트이 방향"+markerangle2.toString())
-                if (markerangle2 < 0){
+                if (-180<markerangle2 && markerangle2 < - 20){
                     tts.speakOut("좌회전하세요")
-                }else{
+                }else if (20< markerangle2 && markerangle2 < 180){
                     tts.speakOut("우회전하세요")
                 }
 //                if (markerangle2.toInt() - azimuth.toInt() > 5 && key != 1) {
@@ -781,6 +781,8 @@ class MainActivity : AppCompatActivity(),
         MainScope().launch {
             if(tmapDirectionMap.isEmpty() == true){
                 // 맵지우기 코드인데 안됨
+                savePolygonOverlay.forEach { it.map = null }
+                savePolygonOverlay.clear()
                 saveMarker.forEach { it.map = null }
                 saveMarker.clear()
                 flagForDirectionMode = false
@@ -791,7 +793,7 @@ class MainActivity : AppCompatActivity(),
                 tts.speakOut(tmapDirectionMapMent.get(0))
                 tmapDirectionMap.removeAt(0)
                 tmapDirectionMapMent.removeAt(0)
-//                adjustGPS(position)
+                adjustGPS(position)
 
             }
         }

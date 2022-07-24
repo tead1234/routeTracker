@@ -34,6 +34,6 @@ class TTS_Module(context:Context):TextToSpeech.OnInitListener {
     }
 
     fun speakOut(text:String){
-        tts.speak(text,TextToSpeech.QUEUE_FLUSH,null,"")
+        tts.speak(text,TextToSpeech.QUEUE_ADD,null,"")
     }
 }
